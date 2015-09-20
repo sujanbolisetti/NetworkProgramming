@@ -7,45 +7,54 @@
 
 #include "usp.h"
 
-// TO DO : Have to understand how to use sys_err function to print the
-// error msg.
-
 int main(int argc, char **argv){
 
 	int sockfd, n;
 	struct sockaddr_in serveraddr;
 	char recvbuff[MAXLINE];
+	char errbuff[MAXLINE];
 
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0){
-		printf("%s\n",strerror(errno));
+		strcpy(errbuff,create_error_message(SOCKET_CREATION_ERROR,errno));
+		write(atoi(argv[2]),errbuff,sizeof(errbuff));
 		exit(-1);
 	}
 
 	bzero(&serveraddr,sizeof(serveraddr));
 
 	serveraddr.sin_family = AF_INET;
-	serveraddr.sin_port = htons(TIME_SERVE_PORT_NUMBER);
+	serveraddr.sin_port = htons(TIME_SERVER_PORT_NUMBER);
 
 	if(inet_pton(AF_INET,argv[1],&serveraddr.sin_addr) <= 0){
-		printf("%s\n",strerror(errno));
+		strcpy(errbuff,create_error_message(PTONERROR,errno));
+		write(atoi(argv[2]),errbuff,sizeof(errbuff));
 		exit(-1);
 	}
 
-	if(connect(sockfd,(struct sockaddr *)&serveraddr, sizeof(serveraddr)) < 0){
-		printf("%s\n",strerror(errno));
+	if(connect(sockfd,(SA *)&serveraddr, sizeof(serveraddr)) < 0){
+		strcpy(errbuff,create_error_message(CONNECT_ERROR,errno));
+		write(atoi(argv[2]),errbuff,sizeof(errbuff));
 		exit(-1);
 	}
 
 	while((n=read(sockfd,recvbuff,sizeof(recvbuff))) > 0){
 
 		recvbuff[n] = 0;
-
 		printf("%s\n",recvbuff);
 	}
 
-	if(n < 0)
-		printf("Read Error");
+	if(n < 0){
+		strcpy(errbuff,"Read Error");
+		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+	}
 
+	if(n==0){
+		strcpy(errbuff,"Server Terminated");
+		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+	}
+
+	close(sockfd);
+	close(atoi(argv[2]));
 	return 0;
 }
 
