@@ -99,10 +99,7 @@ void* time_service(void *arg){
 
 		snprintf(write_buff, sizeof(write_buff), "%.24s\r\n" , ctime(&ticks));
 
-		Writen(fd,write_buff,strlen(write_buff));
-
 		int n=0;
-
 		/**
 		 *  This is a non blocking read used for receiving
 		 *  reset from the client in case when the client
@@ -112,12 +109,15 @@ void* time_service(void *arg){
 			return NULL;
 		}else if(n < 0){
 			/**
-			 *  resetting the error number
-			 *  to zero to avoid reading previous
-			 *  errors incase of no errors.
-			 */
+			  *  resetting the error number
+			  *  to zero to avoid reading previous
+			  *  errors incase of no errors.
+			   */
 			errno = 0;
 		}
+
+		Writen(fd,write_buff,strlen(write_buff));
+
 		usleep(5000000);
 	}
 
@@ -130,7 +130,6 @@ void* time_service(void *arg){
 	return NULL;
 }
 
-
 void* echo_service(void* arg){
 
 	size_t n;
@@ -140,7 +139,7 @@ void* echo_service(void* arg){
 
 again:
 	while((n=read(fd,read_buff,sizeof(read_buff))) > 0){
-		Writen(fd,read_buff,sizeof(read_buff));
+		Writen(fd,read_buff,strlen(read_buff));
 		memset(read_buff,0,sizeof(read_buff));
 	}
 

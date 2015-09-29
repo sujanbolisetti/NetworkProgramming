@@ -16,7 +16,9 @@ int main(int argc, char **argv){
 
 	if((sockfd = socket(AF_INET,SOCK_STREAM,0)) < 0){
 		strcpy(errbuff,create_error_message(SOCKET_CREATION_ERROR,errno));
-		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+		if(write(atoi(argv[2]),errbuff,sizeof(errbuff)) < 0){
+			printf("Write Error :%s\n",strerror(errno));
+		}
 		exit(-1);
 	}
 
@@ -27,13 +29,17 @@ int main(int argc, char **argv){
 
 	if(inet_pton(AF_INET,argv[1],&serveraddr.sin_addr) <= 0){
 		strcpy(errbuff,create_error_message(PTONERROR,errno));
-		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+		if(write(atoi(argv[2]),errbuff,sizeof(errbuff)) < 0){
+			printf("Write Error :%s\n",strerror(errno));
+		}
 		exit(-1);
 	}
 
 	if(connect(sockfd,(SA *)&serveraddr, sizeof(serveraddr)) < 0){
 		strcpy(errbuff,create_error_message(CONNECT_ERROR,errno));
-		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+		if(write(atoi(argv[2]),errbuff,sizeof(errbuff)) < 0){
+			printf("Write Error :%s\n",strerror(errno));
+		}
 		exit(-1);
 	}
 
@@ -45,12 +51,16 @@ int main(int argc, char **argv){
 
 	if(n < 0){
 		strcpy(errbuff,"Read Error");
-		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+		if(write(atoi(argv[2]),errbuff,sizeof(errbuff)) < 0){
+			printf("Write Error :%s\n",strerror(errno));
+		}
 	}
 
 	if(n==0){
 		strcpy(errbuff,"Server Terminated");
-		write(atoi(argv[2]),errbuff,sizeof(errbuff));
+		if(write(atoi(argv[2]),errbuff,sizeof(errbuff)) < 0){
+			printf("Write Error :%s\n",strerror(errno));
+		}
 	}
 
 	close(sockfd);

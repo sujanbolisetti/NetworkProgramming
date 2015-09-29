@@ -9,7 +9,6 @@
 
 int main(int argc, char **argv){
 
-
 	struct hostent *he;
 	struct in_addr **ipaddr_list;
 	struct in_addr servaddr;
@@ -95,27 +94,28 @@ int main(int argc, char **argv){
 				continue;
 			}else{
 				printf("Scan failed with error : %s",strerror(errno));
+				exit(-1);
 			}
 		}
 
 		if(pipe(pfd) < 0){
-				printf("Pipe creation failed");
+				printf("Pipe creation failed : %s\n",strerror(errno));
+				exit(-1);
 		}
 
 		switch(user_input){
 
 		case TIME_SERVICE:
-			childpid = request_service("./daytimecli",host_ipaddress,pfd);
+			childpid = request_service(DAYTIMECLIENTEXENAME,host_ipaddress,pfd);
 			break;
 		case ECHO_SERVICE:
-			childpid = request_service("./echocli",host_ipaddress,pfd);
+			childpid = request_service(ECHOCLIENTEXENAME,host_ipaddress,pfd);
 			break;
 		case QUIT:
 			printf("Quitting the parent process\n");
 			exit(0);
 		default:
-			printf("Please enter the correct option %d\n",user_input);
-
+			printf("Invalid Option Number %d\n",user_input);
 			break;
 		}
 
@@ -128,8 +128,9 @@ int main(int argc, char **argv){
 
 int request_service(char* prog_name, char *host_ipaddress,int pfd[2]){
 
-	char str[5];
+	char str[5],buff[MAXLINE];
 	int n,childpid;
+
 
 	if((childpid = fork()) == 0){
 
@@ -142,8 +143,6 @@ int request_service(char* prog_name, char *host_ipaddress,int pfd[2]){
 	}
 
 	close(pfd[1]);
-
-	char buff[4096];
 
 	while(read(pfd[0],buff,MAXLINE) > 0){
 		printf("Status of the child : %s\n",buff);

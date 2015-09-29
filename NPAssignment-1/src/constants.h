@@ -1,5 +1,5 @@
 /*
- * constants.c
+ * constants.h
  *
  *  Created on: Sep 15, 2015
  *      Author: sujan
@@ -26,6 +26,10 @@
 
 #define SOCKET_CREATION_ERROR "socket creation error: "
 
-#define PTONERROR "presentation to network error: "
+#define PTONERROR "presentation to network address conversion error: "
+
+#define DAYTIMECLIENTEXENAME "./time_cli"
+
+#define ECHOCLIENTEXENAME "./echo_cli"
 
 
