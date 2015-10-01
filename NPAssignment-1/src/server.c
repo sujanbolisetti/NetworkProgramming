@@ -1,5 +1,6 @@
 /*
  * server.c
+ *		Server Program that provides echo service and daytime service.
  *
  *  Created on: Sep 16, 2015
  *      Author: sujan
@@ -20,8 +21,16 @@ int main(int argc,char **argv){
 	timeserver_listenfd = Socket(AF_INET,SOCK_STREAM,0);
 	echoserver_listenfd = Socket(AF_INET,SOCK_STREAM,0);
 
+	/**
+	 *  Setting the socket option reuse address on the listening scoket
+	 *  so that port can be reused.
+	 */
 	setsockopt(timeserver_listenfd,SOL_SOCKET,SO_REUSEADDR,&optval,sizeof(int));
 
+	/**
+	 *  Setting the socket option reuse address on the listening scoket
+	 *  so that port can be reused.
+	 */
 	setsockopt(echoserver_listenfd,SOL_SOCKET,SO_REUSEADDR,&optval,sizeof(int));
 
 	bzero(&timeserveraddr,sizeof(timeserveraddr));
@@ -44,6 +53,8 @@ int main(int argc,char **argv){
 
 	FD_ZERO(&rset);
 
+	printf("Started the server\n");
+
 	for(; ;){
 
 		FD_SET(timeserver_listenfd, &rset);
@@ -51,10 +62,17 @@ int main(int argc,char **argv){
 
 		maxfdp1 = max(timeserver_listenfd,echoserver_listenfd) +1;
 
+		/**
+		 *  Using select as we need to monitor two sockets.
+		 */
 		Select(maxfdp1, &rset, NULL, NULL, NULL);
 
 		if(FD_ISSET(timeserver_listenfd, &rset)){
 
+			/**
+			 *  Doing malloc for every new connection else this connfd will
+			 *  be shared by mulitple threads and can cause race conditions.
+			 */
 			timeserver_connfd = malloc(sizeof(int));
 
 			*timeserver_connfd = Accept(timeserver_listenfd, (SA *)NULL, NULL);
@@ -64,6 +82,10 @@ int main(int argc,char **argv){
 
 		if(FD_ISSET(echoserver_listenfd, &rset)){
 
+			/**
+			 *  Doing malloc for every new connection else this connfd will
+			 *  be shared by mulitple threads and can cause race conditions.
+			*/
 			echoserver_connfd = malloc(sizeof(int));
 
 			*echoserver_connfd = Accept(echoserver_listenfd, (SA *)NULL, NULL);
@@ -74,6 +96,10 @@ int main(int argc,char **argv){
 	return 0;
 }
 
+/**
+ *  Function called by thread and this function provides
+ *  day time service functionality.
+ */
 void* time_service(void *arg){
 
 	Pthread_detach(pthread_self());
@@ -106,7 +132,7 @@ void* time_service(void *arg){
 		 *  crashed and manually killed.
 		 */
 		if((n=read(fd,NULL,MAXLINE)) == 0){
-			return NULL;
+			break;
 		}else if(n < 0){
 			/**
 			  *  resetting the error number
@@ -127,15 +153,21 @@ void* time_service(void *arg){
 	 * Reference count is not incremented with threads.
 	 */
 	close(fd);
+	printf("Time Client Terminated\n");
 	return NULL;
 }
 
+/**
+ *  Function called by thread and this function provides
+ *  echo service functionality.
+ */
 void* echo_service(void* arg){
 
 	size_t n;
 	char read_buff[MAXLINE];
 
 	int fd = *(int *)arg;
+	free(arg);
 
 again:
 	while((n=read(fd,read_buff,sizeof(read_buff))) > 0){
@@ -143,11 +175,17 @@ again:
 		memset(read_buff,0,sizeof(read_buff));
 	}
 
+	/**
+	 *  If the EINTR we will try again.
+	 *  Because EINTR means read system call interrupted
+	 *  due to a signal and it is not a error.
+	 */
 	if(n < 0 && errno == EINTR)
 		goto again;
 	else if(n < 0)
 		printf("Read Error : %s\n",strerror(errno));
 
 	close(fd);
+	printf("Echo Client Terminated\n");
 	return NULL;
 }

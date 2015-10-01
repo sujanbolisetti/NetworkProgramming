@@ -1,5 +1,7 @@
 /*
  * wrapsock.c
+ * 		Wrapper functions for sockets.
+ * 		Partially code was borrowed from Stevens code base.
  *
  *  Created on: Sep 17, 2015
  *      Author: sujan

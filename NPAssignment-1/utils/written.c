@@ -1,5 +1,7 @@
 /*
  * Written.c
+ * 		wrapper function on write syscall.
+ * 		Code was taken from Steven's code base.
  *
  *  Created on: Sep 17, 2015
  *      Author: sujan
@@ -7,7 +9,8 @@
 
 #include "../src/usp.h"
 
-ssize_t						/* Write "n" bytes to a descriptor. */
+/* Write "n" bytes to a descriptor. */
+ssize_t
 writen(int fd, const void *vptr, size_t n)
 {
 	size_t		nleft;
