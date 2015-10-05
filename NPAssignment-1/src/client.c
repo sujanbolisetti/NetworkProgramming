@@ -88,7 +88,7 @@ int main(int argc, char **argv){
 
 		user_input=0;
 
-		printf("Enter the service name \n");
+		printf("Enter the service option number \n");
 
 		printf("1. DAY_TIME\n2. ECHO\n3. QUIT \n");
 

@@ -153,7 +153,7 @@ void* time_service(void *arg){
 	 * Reference count is not incremented with threads.
 	 */
 	close(fd);
-	printf("Time Client Terminated\n");
+	printf("Time client termination: socket read returned with value 0\n");
 	return NULL;
 }
 
@@ -183,9 +183,9 @@ again:
 	if(n < 0 && errno == EINTR)
 		goto again;
 	else if(n < 0)
-		printf("Read Error : %s\n",strerror(errno));
+		printf("Echo client termination: socket read returned with value -1 and with error - %s\n",strerror(errno));
 
 	close(fd);
-	printf("Echo Client Terminated\n");
+	printf("Echo client termination: socket read returned with value 0\n");
 	return NULL;
 }

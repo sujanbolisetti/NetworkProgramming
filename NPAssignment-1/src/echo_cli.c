@@ -77,9 +77,11 @@ int main(int argc, char **argv){
 			if(fgets(sendbuff,MAXLINE,stdin) != NULL){
 				Writen(sockfd,sendbuff,MAXLINE);
 			}else{
-				strcpy(errbuff,"stdin error");
-				if(write(ppfd,errbuff,sizeof(errbuff)) < 0){
-					printf("Write Error :%s\n",strerror(errno));
+				if(!feof(stdin) && ferror(stdin)){
+					strcpy(errbuff,"stdin error");
+					if(write(ppfd,errbuff,sizeof(errbuff)) < 0){
+						printf("Write Error :%s\n",strerror(errno));
+					}
 				}
 				break;
 			}
