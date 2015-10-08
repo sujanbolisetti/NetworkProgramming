@@ -41,10 +41,26 @@
 
 #include <signal.h>
 
+#include <sys/ioctl.h>
+
+#include "constants.h"
+
+struct binded_sock_info{
+
+	int sockfd;
+	char ip_address[128];
+	char network_mask[128];
+	char subnet_adress[128];
+	struct binded_sock_info *next;
+
+};
+
 #define SA struct sockaddr
 
 #define	min(a,b)	((a) < (b) ? (a) : (b))
 #define	max(a,b)	((a) > (b) ? (a) : (b))
+
+#define	FILE_MODE	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
 
 int		Accept(int, SA *, socklen_t *);
 void	Bind(int, const SA *, socklen_t);
@@ -66,5 +82,10 @@ void* time_service(void *arg);
 void* echo_service(void* arg);
 
 void sigchild_handler(int signum);
+
+char *
+Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
+
+void sort(long networkMasks[1024]);
 
 #endif /* USP_H_ */
