@@ -10,4 +10,6 @@
 
 #define LOOPBACK_ADDRESS "127.0.0.1"
 
+#define MAXLINE 1024
+
 #endif /* CONSTANTS_H_ */

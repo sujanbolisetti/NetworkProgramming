@@ -77,6 +77,19 @@ Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 	return(n);		/* can return 0 on timeout */
 }
 
+void Getpeername(int sockfd,struct sockaddr *sa, int* length){
+
+	if(getpeername(sockfd, sa, length) < 0 ){
+		printf("get peer name error %s\n",strerror(errno));
+	}
+}
+
+void Getsockname(int sockfd,struct sockaddr *sa, int* length){
+
+	if(getsockname(sockfd, sa, length) < 0 ){
+		printf("get sock name error %s\n",strerror(errno));
+	}
+}
 
 
 

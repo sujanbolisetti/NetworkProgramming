@@ -43,6 +43,8 @@
 
 #include <sys/ioctl.h>
 
+#include <stdbool.h>
+
 #include "constants.h"
 
 struct binded_sock_info{
@@ -53,6 +55,12 @@ struct binded_sock_info{
 	char subnet_adress[128];
 	struct binded_sock_info *next;
 
+};
+
+struct dg_payload{
+
+	int portNumber;
+	char buff[MAXLINE];
 };
 
 #define SA struct sockaddr
@@ -86,6 +94,10 @@ void sigchild_handler(int signum);
 char *
 Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
 
-void sort(long networkMasks[1024]);
+void Getpeername(int sockfd,struct sockaddr *sa, int* length);
+
+void Getsockname(int sockfd,struct sockaddr *sa, int* length);
+
+void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
 
 #endif /* USP_H_ */
