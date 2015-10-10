@@ -22,8 +22,13 @@ int main(int argc, char **argv){
 	struct sockaddr *sa;
 	int length=sizeof(IPClient);
 	struct binded_sock_info *head=NULL, *temp=NULL;
+	struct connected_client_address *head_client_address=NULL, *temp_client_address=NULL;
+	struct dg_payload pload;
 	fd_set rset;
+
 	int seq_num = 0;
+	char ipAddressSocket[256];
+
 
 	fp=fopen("server.in","r");
 	fscanf(fp,"%d",&portNumber);
@@ -65,10 +70,6 @@ int main(int argc, char **argv){
 
 			Bind(sockfd, (SA *)servaddr,sizeof(*servaddr));
 
-			printf("presentation address %s\n",bsock_info->ip_address);
-
-			printf("presentation address %s\n",bsock_info->ip_address);
-
 	}
 
 	temp->next = NULL;
@@ -98,16 +99,56 @@ int main(int argc, char **argv){
 		Select(maxfd,&rset,NULL,NULL,NULL);
 
 		temp = head;
-		fflush(stdout);
 
 		while(temp!=NULL){
 
 			if(FD_ISSET(temp->sockfd,&rset)){
 
-				struct dg_payload pload;
 				memset(&pload,0,sizeof(pload));
 				recvfrom(temp->sockfd,&pload,sizeof(pload),0,(SA *)&IPClient,&length);
-				printf("requested file name :%s\n",pload.buff);
+
+				inet_ntop(AF_INET,&IPClient.sin_addr,ipAddressSocket,128);
+
+				char portNumber[24];
+				sprintf(portNumber,"%d",ntohs(IPClient.sin_port));
+
+				strcat(ipAddressSocket,":");
+				strcat(ipAddressSocket,portNumber);
+
+				printf("socket address :%s\n",ipAddressSocket);
+
+				bool addressExists =false;
+
+				if(head_client_address!=NULL){
+
+					struct connected_client_address *temp2 = head_client_address;
+
+					while(temp2!=NULL){
+						if(strcmp(temp2->client_sockaddress,ipAddressSocket) == 0){
+							addressExists = true;
+						}
+						temp2 = temp2->next;
+					}
+
+				}
+
+				if(addressExists){
+					printf("Continuing..\n");
+					continue;
+				}
+
+				struct connected_client_address *client_sock_address = (struct connected_client_address*)malloc(sizeof(struct connected_client_address));
+
+				strcpy(client_sock_address->client_sockaddress,ipAddressSocket);
+
+				if(head_client_address == NULL){
+					head_client_address = client_sock_address;
+					temp_client_address = head_client_address;
+				}else{
+					temp_client_address->next=client_sock_address;
+					temp_client_address = client_sock_address;
+					temp_client_address->next = NULL;
+				}
 
 				if((pid = fork()) == 0){
 

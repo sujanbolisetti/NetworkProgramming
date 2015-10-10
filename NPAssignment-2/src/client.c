@@ -41,10 +41,7 @@ int main(int argc,char **argv){
 	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
 						if_temp!=NULL;if_temp = if_temp->ifi_next){
 
-		printf("entered loop\n");
 		clientAddr = (struct sockaddr_in *) if_temp->ifi_addr;
-
-		printf("entered loop -2 \n");
 
 		struct binded_sock_info *bsock_info = (struct binded_sock_info *)malloc(sizeof(struct binded_sock_info));
 
@@ -121,6 +118,10 @@ int main(int argc,char **argv){
 	strcpy(pload.buff,fileName);
 	pload.type = PAYLOAD;
 	pload.seq_number = get_seq_num();
+
+	sendto(sockfd,(void *)&pload,sizeof(pload),0,(SA *)&serverAddr,sizeof(serverAddr));
+
+	sleep(2);
 
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,(SA *)&serverAddr,sizeof(serverAddr));
 

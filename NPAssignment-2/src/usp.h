@@ -57,6 +57,11 @@ struct binded_sock_info{
 
 };
 
+struct connected_client_address{
+	char client_sockaddress[256];
+	struct connected_client_address *next;
+};
+
 struct dg_payload{
 	int type;
 	int seq_number;
