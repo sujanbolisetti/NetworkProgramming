@@ -51,6 +51,7 @@ int main(int argc, char **argv){
 			sockfd = Socket(AF_INET,SOCK_DGRAM,0);
 
 			if(sockfd > maxfd){
+				printf("sock fd %d\n",sockfd);
 				maxfd = sockfd;
 			}
 			servaddr = (struct sockaddr_in *) if_temp->ifi_addr;
@@ -95,7 +96,10 @@ int main(int argc, char **argv){
 
 	FD_ZERO(&rset);
 
+
 	maxfd = maxfd+1;
+	printf("max fd %d\n",maxfd);
+
 	for(; ;){
 
 		temp = head;
@@ -107,6 +111,7 @@ int main(int argc, char **argv){
 		}
 
 		Select(maxfd,&rset,NULL,NULL,NULL);
+		printf("Came out of select\n");
 
 		temp = head;
 
@@ -183,7 +188,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
 
-	inet_pton(AF_INET,sock_info->ip_address,&serverAddr);
+	inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
 
 	printf("client port number %d\n",ntohs(IPClient.sin_port));
 	serverAddr.sin_port = 0;
@@ -197,15 +202,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	int optval=1;
 
-	struct in_addr networkMaskAddr;
+	struct sockaddr_in networkMaskAddr;
 
-	inet_pton(AF_INET,sock_info->network_mask,&networkMaskAddr);
+	inet_pton(AF_INET,sock_info->network_mask,&networkMaskAddr.sin_addr);
 
-	if(networkMaskAddr.s_addr & IPClient.sin_addr.s_addr){
-		isLocal = true;
-	}
-
-	if(isLocal){
+	if(getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,0) > 0){
+		printf("Client is Local\n");
 		setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}
 

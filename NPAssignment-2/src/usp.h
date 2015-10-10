@@ -41,7 +41,13 @@
 
 #include <signal.h>
 
-#include <sys/ioctl.h>
+# include <sys/ioctl.h>
+
+// #include <sys/sockio.h>
+
+#ifdef	HAVE_PTHREAD_H
+# include	<pthread.h>
+#endif
 
 #include <stdbool.h>
 
@@ -107,6 +113,12 @@ void Getsockname(int sockfd,struct sockaddr *sa, int* length);
 void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
 
 void Fscanf(FILE *fp, char *format, void *data);
+
+unsigned long getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
+			struct sockaddr_in *IPClient,unsigned long maxMatch);
+
+int
+Ioctl(int fd, int request, void *arg);
 
 // UDP packet types
 enum PACKET_TYPE
