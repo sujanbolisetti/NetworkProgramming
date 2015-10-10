@@ -25,10 +25,15 @@ int main(int argc,char **argv){
 	int length = sizeof(IPClient),optval=1;
 	bool isLocal=false;
 
-	fp=fopen("client.in","r");
-	fscanf(fp,"%s",IPServer);
-	fscanf(fp,"%d",&portNumber);
-	fscanf(fp,"%s",fileName);
+	if(argc < 2){
+		printf("Kindly enter the input file name\n");
+		exit(0);
+	}
+
+	fp=fopen(argv[1],"r");
+	Fscanf(fp,"%s",IPServer);
+	Fscanf(fp,"%d",&portNumber);
+	Fscanf(fp,"%s",fileName);
 
 	inet_pton(AF_INET,IPServer,&serverAddr.sin_addr);
 	serverAddr.sin_family = AF_INET;
@@ -36,38 +41,39 @@ int main(int argc,char **argv){
 	IPClient.sin_family = AF_INET;
 	IPClient.sin_port = 0;
 
-	printf("initialized variables\n");
-
 	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
 						if_temp!=NULL;if_temp = if_temp->ifi_next){
 
-		clientAddr = (struct sockaddr_in *) if_temp->ifi_addr;
+		if(if_temp->ifi_flags & IFF_UP){
 
-		struct binded_sock_info *bsock_info = (struct binded_sock_info *)malloc(sizeof(struct binded_sock_info));
+			clientAddr = (struct sockaddr_in *) if_temp->ifi_addr;
 
-		if(head == NULL){
-			head = bsock_info;
-			temp = head;
-		}else{
-			temp->next = bsock_info;
-			temp =  bsock_info;
-		}
+			struct binded_sock_info *bsock_info = (struct binded_sock_info *)malloc(sizeof(struct binded_sock_info));
 
-		inet_ntop(AF_INET,&clientAddr->sin_addr,bsock_info->ip_address,sizeof(bsock_info->ip_address));
-
-		struct sockaddr_in *netAddr = (struct sockaddr_in *)if_temp->ifi_ntmaddr;
-
-		if((tempMax= (netAddr->sin_addr.s_addr & serverAddr.sin_addr.s_addr)) > 0){
-			isLocal=true;
-			if(tempMax > max){
-				max = tempMax;
-				IPClient.sin_addr.s_addr = clientAddr->sin_addr.s_addr;
+			if(head == NULL){
+				head = bsock_info;
+				temp = head;
+			}else{
+				temp->next = bsock_info;
+				temp =  bsock_info;
 			}
+
+			inet_ntop(AF_INET,&clientAddr->sin_addr,bsock_info->ip_address,sizeof(bsock_info->ip_address));
+
+			struct sockaddr_in *netAddr = (struct sockaddr_in *)if_temp->ifi_ntmaddr;
+
+			if((tempMax= (netAddr->sin_addr.s_addr & serverAddr.sin_addr.s_addr)) > 0){
+				isLocal=true;
+				if(tempMax > max){
+					max = tempMax;
+					IPClient.sin_addr.s_addr = clientAddr->sin_addr.s_addr;
+				}
+			}
+
+			inet_ntop(AF_INET,&netAddr->sin_addr,bsock_info->network_mask,sizeof(bsock_info->network_mask));
 		}
 
-		inet_ntop(AF_INET,&netAddr->sin_addr,bsock_info->network_mask,sizeof(bsock_info->network_mask));
 	}
-
 	temp->next = NULL;
 	temp = head;
 

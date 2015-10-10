@@ -10,11 +10,11 @@ DEPS =  src/usp.h src/constants.h
 
 all: client server
 
-client: client.o wrapsock.o wrapunix.o get_ifi_info.o
-	${CC} ${FLAGS} client.o wrapsock.o wrapunix.o get_ifi_info.o -o client ${LIBS}
+client: client.o wrapsock.o wrapunix.o get_ifi_info.o io_utils.o
+	${CC} ${FLAGS} client.o wrapsock.o wrapunix.o get_ifi_info.o io_utils.o -o client ${LIBS}
 	
-server: server.o wrapsock.o wrapunix.o get_ifi_info.o 
-	${CC} ${FLAGS} client.o wrapsock.o wrapunix.o get_ifi_info.o -o server ${LIBS}
+server: server.o wrapsock.o wrapunix.o get_ifi_info.o io_utils.o
+	${CC} ${FLAGS} server.o wrapsock.o wrapunix.o get_ifi_info.o io_utils.o -o server ${LIBS}
 	
 server.o: src/server.c ${DEPS}
 	${CC} ${CFLAGS} -c src/server.c
@@ -29,7 +29,12 @@ wrapunix.o: utils/wrapunix.c
 	${CC} ${CFLAGS} -c utils/wrapunix.c
 	
 get_ifi_info.o: utils/get_ifi_info.c
-	${CC} ${CFLAGS} -c utils/get_ifi_info.c	
+	${CC} ${CFLAGS} -c utils/get_ifi_info.c
+	
+io_utils.o: utils/io_utils.c
+	${CC} ${CFLAGS} -c utils/io_utils.c	
+
+
 	
 clean:
 	rm client server *.o

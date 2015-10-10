@@ -30,14 +30,23 @@ int main(int argc, char **argv){
 	char ipAddressSocket[256];
 
 
-	fp=fopen("server.in","r");
-	fscanf(fp,"%d",&portNumber);
-	fscanf(fp,"%d",&slidingWindowSize);
+	if(argc < 2){
+		printf("Kindly enter the input file name\n");
+		exit(0);
+	}
+
+	fp=fopen(argv[1],"r");
+
+	Fscanf(fp,"%d",&portNumber);
+	Fscanf(fp,"%d",&slidingWindowSize);
 
 	printf("%d %d\n",portNumber,slidingWindowSize);
 
 	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
 				if_temp!=NULL;if_temp = if_temp->ifi_next){
+
+		if(if_temp->ifi_flags & IFF_UP){
+
 
 			sockfd = Socket(AF_INET,SOCK_DGRAM,0);
 
@@ -70,6 +79,7 @@ int main(int argc, char **argv){
 
 			Bind(sockfd, (SA *)servaddr,sizeof(*servaddr));
 
+		}
 	}
 
 	temp->next = NULL;

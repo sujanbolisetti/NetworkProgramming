@@ -106,6 +106,8 @@ void Getsockname(int sockfd,struct sockaddr *sa, int* length);
 
 void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
 
+void Fscanf(FILE *fp, char *format, void *data);
+
 // UDP packet types
 enum PACKET_TYPE
 {
