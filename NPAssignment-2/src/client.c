@@ -124,7 +124,7 @@ int main(int argc,char **argv){
 	memset(&pload,0,sizeof(pload));
 
 	recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
-	printf("new servr port number %d\n",ntohs(pload.portNumber));
+	printf("new server port number %d\n",ntohs(pload.portNumber));
 
 	struct sockaddr_in newServerAddr;
 	newServerAddr.sin_port = htons(pload.portNumber);
@@ -132,13 +132,14 @@ int main(int argc,char **argv){
 	newServerAddr.sin_family = AF_INET;
 
 //	memset(&serverAddr,0,sizeof(serverAddr));
+//	serverAddr.sin_port = 0;
 //	serverAddr.sin_family = AF_UNSPEC;
+//	serverAddr.sin_addr.s_addr = 0;
 //
 //	if(connect(sockfd,(SA *)&serverAddr,sizeof(serverAddr)) < 0){
 //		printf("Connection Error :%s",strerror(errno));
 //	}
-
-
+//
 //	if(connect(sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
 //		printf("Connection Error :%s",strerror(errno));
 //	}
@@ -153,19 +154,17 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	int k = 0;
-	while(k < 10){
+	printf("sending ack that sockets set\n");
+	memset(&pload,0,sizeof(pload));
+	strcpy(pload.buff, "DONE");
+	sendto(sockfd,(void *)&pload,sizeof(pload),0,(SA *)&newServerAddr,sizeof(newServerAddr));
 
+	printf("reading on port Number :%d\n",ntohs(IPClient.sin_port));
+	int k = 0;
+	while(k < 10) {
 		memset(&pload,0,sizeof(pload));
-		printf("reading on port Number :%d\n",ntohs(IPClient.sin_port));
 		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
-		printf("port number %d\n",ntohs(pload.portNumber));
+		printf("received number is %d\n",ntohs(pload.portNumber));
 		k++;
 	}
-
 }
-
-
-
-
-

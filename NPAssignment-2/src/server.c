@@ -162,19 +162,22 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	sendto(sock_info->sockfd,(void *)&pload,sizeof(pload),0,(SA *)&IPClient,sizeof(IPClient));
 
-
-
 	if(connect(conn_sockfd,(SA *)&IPClient,sizeof(IPClient)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	int k = 0;
-	while(k < 10){
-		memset(&pload,0,sizeof(pload));
-		pload.portNumber = htons(k);
-		printf("writing in the socket\n");
-		sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
-		k++;
+	memset(&pload,0,sizeof(pload));
+	recvfrom(conn_sockfd,&pload,sizeof(pload),0,NULL,NULL);
+	if(strcmp(pload.buff, "DONE") == 0)
+	{
+		printf("Sending data...\n");
+		int k = 0;
+		while(k < 10){
+			memset(&pload,0,sizeof(pload));
+			pload.portNumber = htons(k);
+			printf("writing in the socket : %d\n", htons(pload.portNumber));
+			sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			k++;
+		}
 	}
-
 }
