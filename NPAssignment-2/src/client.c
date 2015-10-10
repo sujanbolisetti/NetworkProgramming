@@ -7,6 +7,9 @@
 #include "usp.h"
 #include  "unpifi.h"
 
+int seq_num = 0;
+int get_seq_num();
+
 int main(int argc,char **argv){
 
 	FILE *fp;
@@ -116,33 +119,21 @@ int main(int argc,char **argv){
 	memset(&pload,0,sizeof(pload));
 
 	strcpy(pload.buff,fileName);
+	pload.type = PAYLOAD;
+	pload.seq_number = get_seq_num();
 
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,(SA *)&serverAddr,sizeof(serverAddr));
 
 	int conn_port;
-
 	memset(&pload,0,sizeof(pload));
-
 	recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
-	printf("new server port number %d\n",ntohs(pload.portNumber));
+
+	printf("Packet type:%d : new server port number %d\n", ntohs(pload.type), ntohs(pload.portNumber));
 
 	struct sockaddr_in newServerAddr;
 	newServerAddr.sin_port = htons(pload.portNumber);
 	newServerAddr.sin_addr.s_addr = serverAddr.sin_addr.s_addr;
 	newServerAddr.sin_family = AF_INET;
-
-//	memset(&serverAddr,0,sizeof(serverAddr));
-//	serverAddr.sin_port = 0;
-//	serverAddr.sin_family = AF_UNSPEC;
-//	serverAddr.sin_addr.s_addr = 0;
-//
-//	if(connect(sockfd,(SA *)&serverAddr,sizeof(serverAddr)) < 0){
-//		printf("Connection Error :%s",strerror(errno));
-//	}
-//
-//	if(connect(sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
-//		printf("Connection Error :%s",strerror(errno));
-//	}
 
 	close(sockfd);
 
@@ -157,6 +148,9 @@ int main(int argc,char **argv){
 	printf("sending ack that sockets set\n");
 	memset(&pload,0,sizeof(pload));
 	strcpy(pload.buff, "DONE");
+	pload.type = ACK;
+	pload.seq_number = get_seq_num();
+
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,(SA *)&newServerAddr,sizeof(newServerAddr));
 
 	printf("reading on port Number :%d\n",ntohs(IPClient.sin_port));
@@ -167,4 +161,9 @@ int main(int argc,char **argv){
 		printf("received number is %d\n",ntohs(pload.portNumber));
 		k++;
 	}
+}
+
+int get_seq_num()
+{
+	return seq_num++;
 }

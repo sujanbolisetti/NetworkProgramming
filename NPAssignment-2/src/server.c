@@ -8,6 +8,9 @@
 #include "usp.h"
 #include  "unpifi.h"
 
+int seq_num = 0;
+int get_seq_num();
+
 int main(int argc, char **argv){
 
 	FILE *fp;
@@ -20,6 +23,7 @@ int main(int argc, char **argv){
 	int length=sizeof(IPClient);
 	struct binded_sock_info *head=NULL, *temp=NULL;
 	fd_set rset;
+	int seq_num = 0;
 
 	fp=fopen("server.in","r");
 	fscanf(fp,"%d",&portNumber);
@@ -159,6 +163,8 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	memset(&pload,0,sizeof(pload));
 	 //= (struct dg_payload)malloc(sizeof(struct dg_payload));
 	pload.portNumber = htons(serverAddr.sin_port);
+	pload.seq_number = get_seq_num();
+	pload.type = PAYLOAD;
 
 	sendto(sock_info->sockfd,(void *)&pload,sizeof(pload),0,(SA *)&IPClient,sizeof(IPClient));
 
@@ -168,16 +174,23 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	memset(&pload,0,sizeof(pload));
 	recvfrom(conn_sockfd,&pload,sizeof(pload),0,NULL,NULL);
-	if(strcmp(pload.buff, "DONE") == 0)
+	if(pload.type == ACK)
 	{
 		printf("Sending data...\n");
 		int k = 0;
 		while(k < 10){
 			memset(&pload,0,sizeof(pload));
 			pload.portNumber = htons(k);
+			pload.seq_number = get_seq_num();
+			pload.type = PAYLOAD;
 			printf("writing in the socket : %d\n", htons(pload.portNumber));
 			sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 			k++;
 		}
 	}
+}
+
+int get_seq_num()
+{
+	return seq_num++;
 }

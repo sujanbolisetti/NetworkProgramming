@@ -58,7 +58,8 @@ struct binded_sock_info{
 };
 
 struct dg_payload{
-
+	int type;
+	int seq_number;
 	int portNumber;
 	char buff[MAXLINE];
 };
@@ -99,5 +100,12 @@ void Getpeername(int sockfd,struct sockaddr *sa, int* length);
 void Getsockname(int sockfd,struct sockaddr *sa, int* length);
 
 void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
+
+// UDP packet types
+enum PACKET_TYPE
+{
+	ack,
+	pay_load
+};
 
 #endif /* USP_H_ */

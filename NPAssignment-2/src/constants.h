@@ -12,4 +12,9 @@
 
 #define MAXLINE 1024
 
+// UDP packet types
+#define ACK 0
+#define PAYLOAD 1
+
+
 #endif /* CONSTANTS_H_ */
