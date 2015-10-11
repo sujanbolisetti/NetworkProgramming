@@ -64,6 +64,7 @@ struct binded_sock_info{
 };
 
 struct connected_client_address{
+	char child_pid[256];
 	char client_sockaddress[256];
 	struct connected_client_address *next;
 };
@@ -126,6 +127,10 @@ void printInterfaceDetails(struct binded_sock_info *head);
 
 int
 Ioctl(int fd, int request, void *arg);
+
+bool Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
+bool Sendto(int , struct dg_payload *, ssize_t , int ,  struct sockaddr *, socklen_t );
+
 
 // UDP packet types
 enum PACKET_TYPE

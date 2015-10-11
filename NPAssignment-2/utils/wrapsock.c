@@ -91,5 +91,43 @@ void Getsockname(int sockfd,struct sockaddr *sa, int* length){
 	}
 }
 
+bool Sendto(int socket, struct dg_payload* pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t socklen)
+{
+	struct dg_payload ack;
+	printf("Packet sent seq number:");
+	sendto(socket, (void *) pload, size, flags, sa, socklen);
+	printf("%d\n", pload->seq_number);
+
+	memset(&ack, 0, sizeof(ack));
+	recvfrom(socket, &ack, sizeof(ack), 0, NULL, NULL);
+	printf("Ack received seq number %d\n", ack.seq_number);
+	if(ack.type == ACK && ack.seq_number == pload->seq_number)
+	{
+		return true;
+	}
+
+	return false;
+}
+
+void sendAck(int socket, int seq_num, struct sockaddr *sa)
+{
+	struct dg_payload ack;
+	ack.type = ACK;
+	ack.seq_number = seq_num;
+	sendto(socket, (void *) &ack, sizeof(ack), 0, sa, sizeof(*sa));
+	printf("Ack sent to seq number:%d\n", ack.seq_number);
+}
+
+bool Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t *socklen)
+{
+	printf("Packet received seq number:");
+	recvfrom(socket, pload, size, flags, sa, socklen);
+	printf("%d\n", pload->seq_number);
+
+	sendAck(socket, pload->seq_number, sa);
+	return true;
+}
+
+
 
 

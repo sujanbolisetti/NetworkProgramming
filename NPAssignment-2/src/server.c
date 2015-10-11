@@ -51,8 +51,6 @@ int main(int argc, char **argv){
 	printf("Server Interfaces and their details\n");
 	printInterfaceDetails(head);
 
-
-
 	FD_ZERO(&rset);
 
 	/**
@@ -126,8 +124,10 @@ int main(int argc, char **argv){
 				if((pid = fork()) == 0){
 					printf("forked a child and handled client connection\n");
 					doFileTransfer(temp,IPClient);
-				}else{
-					// have to use the PID for tracking
+
+				}else if(pid > 0){
+						// have to use the PID for tracking
+						sprintf(temp_client_address->child_pid,"%d",pid);
 				}
 			}
 			temp = temp->next;
@@ -188,8 +188,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	printf("Server Child is running on IP-Address :%s with port number :%d\n",IPServer,ntohs(serverAddr.sin_port));
 
 	memset(&pload,0,sizeof(pload));
-	recvfrom(conn_sockfd,&pload,sizeof(pload),0,NULL,NULL);
-	if(pload.type == ACK)
+	recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
+
+	if(pload.type ==  ACK)
 	{
 		printf("Sending data...\n");
 		int k = 0;
@@ -199,7 +200,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			pload.seq_number = get_seq_num();
 			pload.type = PAYLOAD;
 			printf("writing in the socket : %d\n", htons(pload.portNumber));
-			sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			sendto(conn_sockfd, &pload, sizeof(pload), 0, NULL, 0);
 			k++;
 		}
 	}
@@ -207,5 +208,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 int get_seq_num()
 {
-	return seq_num++;
+	seq_num++;
+	return seq_num;
 }
+

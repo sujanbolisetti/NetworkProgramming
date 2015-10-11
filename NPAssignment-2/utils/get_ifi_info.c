@@ -5,8 +5,6 @@
  *      Author: sujan
  */
 
-
-/* include get_ifi_info1 */
 #include   "../src/unpifi.h"
 
 struct ifi_info *
