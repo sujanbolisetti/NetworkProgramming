@@ -122,7 +122,7 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	printf(" client port number %d\n",ntohs(IPClient.sin_port));
+	printf("client port number %d\n",ntohs(IPClient.sin_port));
 
 	struct sockaddr_in peerAddress;
 	int peerAddrLength = sizeof(peerAddress);
@@ -170,7 +170,6 @@ int main(int argc,char **argv){
 	strcpy(pload.buff, "DONE");
 	pload.type = ACK;
 	pload.seq_number = get_seq_num();
-
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
 	printf("reading on port Number :%d\n",ntohs(IPClient.sin_port));

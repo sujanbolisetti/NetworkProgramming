@@ -89,7 +89,7 @@ int main(int argc, char **argv){
 
 	while(temp!=NULL){
 
-		printf("IP Adress %s\n",temp->ip_address);
+		printf("IP Address %s\n",temp->ip_address);
 		printf("Network Mask %s\n",temp->network_mask);
 		temp=temp->next;
 	}
@@ -170,8 +170,9 @@ int main(int argc, char **argv){
 					printf("forked a child and handled client connection\n");
 					doFileTransfer(temp,IPClient);
 
-				}else{
+				}else if(pid > 0){
 					// have to use the PID for tracking
+					sprintf(temp_client_address->child_pid,"%d",pid);
 				}
 			}
 			temp = temp->next;
@@ -198,7 +199,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
-	printf("conn_fd port number :%d\n",ntohs(serverAddr.sin_port));
+	printf("conn_fd port number :%d\n", ntohs(serverAddr.sin_port));
 
 	int optval=1;
 
@@ -226,8 +227,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	}
 
 	memset(&pload,0,sizeof(pload));
-	recvfrom(conn_sockfd,&pload,sizeof(pload),0,NULL,NULL);
-	if(pload.type == ACK)
+	recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
+
+	if(pload.type ==  ACK)
 	{
 		printf("Sending data...\n");
 		int k = 0;
@@ -237,7 +239,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			pload.seq_number = get_seq_num();
 			pload.type = PAYLOAD;
 			printf("writing in the socket : %d\n", htons(pload.portNumber));
-			sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			sendto(conn_sockfd, &pload, sizeof(pload), 0, NULL, 0);
 			k++;
 		}
 	}
@@ -245,5 +247,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 int get_seq_num()
 {
-	return seq_num++;
+	seq_num++;
+	return seq_num;
 }
+

@@ -32,3 +32,30 @@ unsigned long getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_
 	}
 	return maxMatch;
 }
+
+void removeClientFromList(int child_pid, struct connected_client_address **head)
+{
+	char sChild_pid[256];
+	sprintf(sChild_pid,"%d",child_pid);
+	struct connected_client_address *prev = *head;
+	struct connected_client_address *temp = (*head) -> next;
+	int present = 0;
+
+	if(strcmp(temp->child_pid, sChild_pid) == 0)
+	{
+			*head = (*head) -> next;
+			free(prev);
+			return;
+	}
+
+	while(temp != NULL)
+	{
+			if(strcmp(temp->child_pid, sChild_pid) == 0)
+			{
+					prev -> next = temp -> next;
+					free(temp);
+			}
+			prev = temp;
+			temp = temp -> next;
+	}
+}
