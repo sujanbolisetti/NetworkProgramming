@@ -24,8 +24,10 @@ int main(int argc,char **argv){
 	struct sockaddr_in serverAddr,IPClient;
 	int length = sizeof(IPClient),optval=1;
 	bool isLocal=false;
+	struct in_addr subnet_addr;
 	unsigned long maxMatch=0;
 	bool isLoopBack=false;
+
 
 	if(argc < 2){
 		printf("Kindly enter the input file name\n");
@@ -37,7 +39,7 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%d",&portNumber);
 	Fscanf(fp,"%s",fileName);
 
-	printf("server address %s\n",IPServer);
+	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
 	inet_pton(AF_INET,IPServer,&serverAddr.sin_addr);
 	serverAddr.sin_family = AF_INET;
@@ -53,47 +55,17 @@ int main(int argc,char **argv){
 		isLoopBack=true;
 	}
 
-	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
-						if_temp!=NULL;if_temp = if_temp->ifi_next){
-
-		if(if_temp->ifi_flags & IFF_UP){
-
-			clientAddr = (struct sockaddr_in *) if_temp->ifi_addr;
-
-			struct binded_sock_info *bsock_info = (struct binded_sock_info *)malloc(sizeof(struct binded_sock_info));
-
-			if(head == NULL){
-				head = bsock_info;
-				temp = head;
-			}else{
-				temp->next = bsock_info;
-				temp =  bsock_info;
-			}
-
-			inet_ntop(AF_INET,&clientAddr->sin_addr,bsock_info->ip_address,sizeof(bsock_info->ip_address));
-
-			struct sockaddr_in *netAddr = (struct sockaddr_in *)if_temp->ifi_ntmaddr;
-
-			if(!isLoopBack){
-				maxMatch = getClientIPAddress(clientAddr,netAddr,&serverAddr,&IPClient,maxMatch);
-			}
-
-			inet_ntop(AF_INET,&netAddr->sin_addr,bsock_info->network_mask,sizeof(bsock_info->network_mask));
-		}
-
+	if(!isLoopBack){
+		head = getInterfaces(portNumber,&maxMatch,&serverAddr,&IPClient);
+	}else{
+		head = getInterfaces(portNumber,&maxMatch,NULL,NULL);
 	}
-	temp->next = NULL;
-	temp = head;
 
 	/**
 	 *  We are printing the interface information to STDOUT.
 	 */
-	while(temp!=NULL){
-		printf("IP Adress %s\n",temp->ip_address);
-		printf("Network Mask %s\n",temp->network_mask);
-		temp=temp->next;
-	}
-
+	printf("Client Interfaces and their details\n");
+	printInterfaceDetails(head);
 
 	/**
 	 * Checking the server address is local
@@ -118,18 +90,23 @@ int main(int argc,char **argv){
 
 	Getsockname(sockfd,(SA *)&IPClient,&length);
 
+	inet_ntop(AF_INET,&IPClient.sin_addr,clientIP,sizeof(clientIP));
+
+	printf("Client is running on IP-Adress :%s with Port Number :%d\n",clientIP,ntohs(IPClient.sin_port));
+
 	if(connect(sockfd,(SA *)&serverAddr,sizeof(serverAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	printf(" client port number %d\n",ntohs(IPClient.sin_port));
-
 	struct sockaddr_in peerAddress;
+
 	int peerAddrLength = sizeof(peerAddress);
 
 	Getpeername(sockfd,(SA *)&peerAddress,&peerAddrLength);
 
-	printf("server port number %d\n",peerAddress.sin_port);
+	inet_ntop(AF_INET,&peerAddress.sin_addr,IPServer,sizeof(IPServer));
+
+	printf("Connecting to server running on IPAddress :%s with portNumber :%d\n",IPServer,ntohs(peerAddress.sin_port));
 
 	struct dg_payload pload;
 
@@ -138,29 +115,26 @@ int main(int argc,char **argv){
 	strcpy(pload.buff,fileName);
 	pload.type = PAYLOAD;
 	pload.seq_number = get_seq_num();
-
-	printf("Before Sending\n");
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-	printf("After Sending\n");
+	printf("Client has sent the file Name\n");
 
-	int conn_port;
 	memset(&pload,0,sizeof(pload));
 	recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
 
-	printf("Packet type:%d : new server port number %d\n", ntohs(pload.type), pload.portNumber);
+	printf("New Emphemeral PortNumber of the Server %d\n",pload.portNumber);
+
+	close(sockfd);
 
 	struct sockaddr_in newServerAddr;
 	newServerAddr.sin_port = htons(pload.portNumber);
 	newServerAddr.sin_addr.s_addr = serverAddr.sin_addr.s_addr;
 	newServerAddr.sin_family = AF_INET;
 
-	close(sockfd);
-
 	sockfd = Socket(AF_INET,SOCK_DGRAM,0);
+
 	Bind(sockfd,(SA *)&IPClient,sizeof(IPClient));
 
-	Getsockname(sockfd,(SA *)&IPClient,&length);
 	if(connect(sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
@@ -173,13 +147,13 @@ int main(int argc,char **argv){
 
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-	printf("reading on port Number :%d\n",ntohs(IPClient.sin_port));
 	int k = 0;
 	while(k < 10) {
 		memset(&pload,0,sizeof(pload));
 		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
 		printf("received number is %d\n",ntohs(pload.portNumber));
 		k++;
+
 	}
 }
 

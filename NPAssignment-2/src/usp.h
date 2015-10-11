@@ -114,8 +114,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
 
 void Fscanf(FILE *fp, char *format, void *data);
 
-unsigned long getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
-			struct sockaddr_in *IPClient,unsigned long maxMatch);
+void getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
+			struct sockaddr_in *IPClient,unsigned long* maxMatch);
+
+struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
+			struct sockaddr_in *serverAddr,struct sockaddr_in *IPClient);
+
+int getMaxFD(struct binded_sock_info *head);
+
+void printInterfaceDetails(struct binded_sock_info *head);
 
 int
 Ioctl(int fd, int request, void *arg);

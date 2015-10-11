@@ -16,16 +16,15 @@ int main(int argc, char **argv){
 	FILE *fp;
 	int portNumber,slidingWindowSize;
 	int sockfd,maxfd=0,pid;
-	struct ifi_info *if_head, *if_temp;
 	struct sockaddr_in *servaddr;
 	struct sockaddr_in IPClient;
 	struct sockaddr *sa;
-	int length=sizeof(IPClient);
 	struct binded_sock_info *head=NULL, *temp=NULL;
 	struct connected_client_address *head_client_address=NULL, *temp_client_address=NULL;
+	struct in_addr subnet_addr;
 	struct dg_payload pload;
+	int length=sizeof(IPClient);
 	fd_set rset;
-
 	int seq_num = 0;
 	char ipAddressSocket[256];
 
@@ -35,70 +34,31 @@ int main(int argc, char **argv){
 		exit(0);
 	}
 
+	/**
+	 *  Reading the Input arguments from the input file.
+	 */
 	fp=fopen(argv[1],"r");
-
 	Fscanf(fp,"%d",&portNumber);
 	Fscanf(fp,"%d",&slidingWindowSize);
 
-	printf("%d %d\n",portNumber,slidingWindowSize);
+	printf("Server Well Known Port Number:%d\n",portNumber);
 
-	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
-				if_temp!=NULL;if_temp = if_temp->ifi_next){
+	/**
+	 * Gettting the interface details.
+	 */
+	head = getInterfaces(portNumber,NULL,NULL,NULL);
 
-		if(if_temp->ifi_flags & IFF_UP){
+	printf("Server Interfaces and their details\n");
+	printInterfaceDetails(head);
 
 
-			sockfd = Socket(AF_INET,SOCK_DGRAM,0);
-
-			if(sockfd > maxfd){
-				printf("sock fd %d\n",sockfd);
-				maxfd = sockfd;
-			}
-			servaddr = (struct sockaddr_in *) if_temp->ifi_addr;
-			servaddr->sin_family = AF_INET;
-			servaddr->sin_port = htons(portNumber);
-
-			struct binded_sock_info *bsock_info = (struct binded_sock_info *)malloc(sizeof(struct binded_sock_info));
-
-			if(head == NULL){
-
-				head = bsock_info;
-				temp = head;
-			}else{
-
-				temp->next = bsock_info;
-				temp =  bsock_info;
-			}
-
-			bsock_info->sockfd = sockfd;
-
-			inet_ntop(AF_INET,&servaddr->sin_addr,bsock_info->ip_address,sizeof(bsock_info->ip_address));
-
-			struct sockaddr_in *netAddr = (struct sockaddr_in *)if_temp->ifi_ntmaddr;
-
-			inet_ntop(AF_INET,&netAddr->sin_addr,bsock_info->network_mask,sizeof(bsock_info->network_mask));
-
-			Bind(sockfd, (SA *)servaddr,sizeof(*servaddr));
-
-		}
-	}
-
-	temp->next = NULL;
-
-	temp = head;
-
-	while(temp!=NULL){
-
-		printf("IP Adress %s\n",temp->ip_address);
-		printf("Network Mask %s\n",temp->network_mask);
-		temp=temp->next;
-	}
 
 	FD_ZERO(&rset);
 
-
-	maxfd = maxfd+1;
-	printf("max fd %d\n",maxfd);
+	/**
+	 *  Maxfd to monitor on select.
+	 */
+	maxfd = getMaxFD(head)+1;
 
 	for(; ;){
 
@@ -111,8 +71,6 @@ int main(int argc, char **argv){
 		}
 
 		Select(maxfd,&rset,NULL,NULL,NULL);
-		printf("Came out of select\n");
-
 		temp = head;
 
 		while(temp!=NULL){
@@ -122,54 +80,52 @@ int main(int argc, char **argv){
 				memset(&pload,0,sizeof(pload));
 				recvfrom(temp->sockfd,&pload,sizeof(pload),0,(SA *)&IPClient,&length);
 
-				inet_ntop(AF_INET,&IPClient.sin_addr,ipAddressSocket,128);
+//				inet_ntop(AF_INET,&IPClient.sin_addr,ipAddressSocket,128);
+//
+//				char portNumber[24];
+//				sprintf(portNumber,"%d",ntohs(IPClient.sin_port));
+//
+//				strcat(ipAddressSocket,":");
+//				strcat(ipAddressSocket,portNumber);
+//
+//				printf("socket address :%s\n",ipAddressSocket);
+//
+//				bool addressExists =false;
+//
+//				if(head_client_address!=NULL){
+//
+//					struct connected_client_address *temp2 = head_client_address;
+//
+//					while(temp2!=NULL){
+//						if(strcmp(temp2->client_sockaddress,ipAddressSocket) == 0){
+//							addressExists = true;
+//						}
+//						temp2 = temp2->next;
+//					}
+//
+//				}
+//
+//				if(addressExists){
+//					printf("Continuing..\n");
+//					continue;
+//				}
 
-				char portNumber[24];
-				sprintf(portNumber,"%d",ntohs(IPClient.sin_port));
-
-				strcat(ipAddressSocket,":");
-				strcat(ipAddressSocket,portNumber);
-
-				printf("socket address :%s\n",ipAddressSocket);
-
-				bool addressExists =false;
-
-				if(head_client_address!=NULL){
-
-					struct connected_client_address *temp2 = head_client_address;
-
-					while(temp2!=NULL){
-						if(strcmp(temp2->client_sockaddress,ipAddressSocket) == 0){
-							addressExists = true;
-						}
-						temp2 = temp2->next;
-					}
-
-				}
-
-				if(addressExists){
-					printf("Continuing..\n");
-					continue;
-				}
-
-				struct connected_client_address *client_sock_address = (struct connected_client_address*)malloc(sizeof(struct connected_client_address));
-
-				strcpy(client_sock_address->client_sockaddress,ipAddressSocket);
-
-				if(head_client_address == NULL){
-					head_client_address = client_sock_address;
-					temp_client_address = head_client_address;
-				}else{
-					temp_client_address->next=client_sock_address;
-					temp_client_address = client_sock_address;
-					temp_client_address->next = NULL;
-				}
+//				struct connected_client_address *client_sock_address = (struct connected_client_address*)malloc(sizeof(struct connected_client_address));
+//
+//				strcpy(client_sock_address->client_sockaddress,ipAddressSocket);
+//
+//				if(head_client_address == NULL){
+//					head_client_address = client_sock_address;
+//					temp_client_address = head_client_address;
+//				}else{
+//					temp_client_address->next=client_sock_address;
+//					temp_client_address = client_sock_address;
+//					temp_client_address->next = NULL;
+//				}
 
 				if((pid = fork()) == 0){
-
 					printf("forked a child and handled client connection\n");
 					doFileTransfer(temp,IPClient);
-
 				}else{
 					// have to use the PID for tracking
 				}
@@ -184,13 +140,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	char buff[MAXLINE];
 	bool isLocal=false;
 	int conn_sockfd = Socket(AF_INET,SOCK_DGRAM,0);
-
+	char IPServer[128];
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
 
 	inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
 
-	printf("client port number %d\n",ntohs(IPClient.sin_port));
 	serverAddr.sin_port = 0;
 	serverAddr.sin_family = AF_INET;
 
@@ -198,23 +153,24 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
-	printf("conn_fd port number :%d\n",ntohs(serverAddr.sin_port));
-
 	int optval=1;
 
 	struct sockaddr_in networkMaskAddr;
 
 	inet_pton(AF_INET,sock_info->network_mask,&networkMaskAddr.sin_addr);
 
-	if(getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,0) > 0){
-		printf("Client is Local\n");
+	unsigned long matchNumber=0;
+
+	getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,&matchNumber);
+
+	if(matchNumber > 0){
+		printf("Client Host is Local\n");
 		setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}
 
 	struct dg_payload pload;
 
 	memset(&pload,0,sizeof(pload));
-	 //= (struct dg_payload)malloc(sizeof(struct dg_payload));
 	pload.portNumber = htons(serverAddr.sin_port);
 	pload.seq_number = get_seq_num();
 	pload.type = PAYLOAD;
@@ -224,6 +180,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	if(connect(conn_sockfd,(SA *)&IPClient,sizeof(IPClient)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
+
+	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
+
+	inet_ntop(AF_INET,&serverAddr.sin_addr,IPServer,sizeof(IPServer));
+
+	printf("Server Child is running on IP-Address :%s with port number :%d\n",IPServer,ntohs(serverAddr.sin_port));
 
 	memset(&pload,0,sizeof(pload));
 	recvfrom(conn_sockfd,&pload,sizeof(pload),0,NULL,NULL);
