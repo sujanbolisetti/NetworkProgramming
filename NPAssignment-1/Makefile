@@ -1,28 +1,3 @@
-# This is a sample Makefile which compiles source files named:
-# src/daytimecli.c
-# src/echoclient.c
-# src/server.c
-# src/client.c
-#
-# and creating executables: "server", "client", "time_cli"
-# and "echo_cli", respectively.
-#
-# It uses various standard libraries, and the copy of Stevens'
-# library "libunp.a" in ~cse533/Stevens/unpv13e_solaris2.10 .
-#
-# It also picks up the thread-safe version of "readline.c"
-# from Stevens' directory "threads" and uses it when building
-# the executable "server".
-#
-# It is set up, for illustrative purposes, to enable you to use
-# the Stevens code in the ~cse533/Stevens/unpv13e_solaris2.10/lib
-# subdirectory (where, for example, the file "unp.h" is located)
-# without your needing to maintain your own, local copies of that
-# code, and without your needing to include such code in the
-# submissions of your assignments.
-#
-# Modify it as needed, and include it with your submission.
-
 CC = gcc
 
 LIBS = -lresolv -lnsl -lpthread
@@ -68,12 +43,6 @@ wrappthread.o: utils/wrappthread.c
 
 errorutils.o: utils/errorutils.c
 	  ${CC} ${CFLAGS} -c utils/errorutils.c
-
-# pick up the thread-safe version of readline.c from directory "threads"
-
-#readline.o: /home/courses/cse533/Stevens/unpv13e_solaris2.10/threads/readline.c
-#	${CC} ${CFLAGS} -c /home/courses/cse533/Stevens/unpv13e_solaris2.10/threads/readline.c
-
 
 clean:
 	rm echo_cli server client time_cli *.o

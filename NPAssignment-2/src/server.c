@@ -10,6 +10,7 @@
 
 int seq_num = 0;
 int get_seq_num();
+struct connected_client_address *head_client_address=NULL;
 
 int main(int argc, char **argv){
 
@@ -20,13 +21,14 @@ int main(int argc, char **argv){
 	struct sockaddr_in IPClient;
 	struct sockaddr *sa;
 	struct binded_sock_info *head=NULL, *temp=NULL;
-	struct connected_client_address *head_client_address=NULL, *temp_client_address=NULL;
+	struct connected_client_address *temp_client_address=NULL;
 	struct in_addr subnet_addr;
 	struct dg_payload pload;
 	int length=sizeof(IPClient);
 	fd_set rset;
 	int seq_num = 0;
-	char ipAddressSocket[256];
+	char* ipAddressSocket;
+	struct sigaction new_action, old_action;
 
 
 	if(argc < 2){
@@ -50,6 +52,15 @@ int main(int argc, char **argv){
 
 	printf("Server Interfaces and their details\n");
 	printInterfaceDetails(head);
+
+
+	/**
+	 * Registering signal handler for the SIGCHLD signal.
+	 */
+	new_action.sa_handler = sigchild_handler;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	sigaction(SIGCHLD,NULL,&old_action);
 
 	FD_ZERO(&rset);
 
@@ -78,56 +89,41 @@ int main(int argc, char **argv){
 				memset(&pload,0,sizeof(pload));
 				recvfrom(temp->sockfd,&pload,sizeof(pload),0,(SA *)&IPClient,&length);
 
-//				inet_ntop(AF_INET,&IPClient.sin_addr,ipAddressSocket,128);
-//
-//				char portNumber[24];
-//				sprintf(portNumber,"%d",ntohs(IPClient.sin_port));
-//
-//				strcat(ipAddressSocket,":");
-//				strcat(ipAddressSocket,portNumber);
-//
-//				printf("socket address :%s\n",ipAddressSocket);
-//
-//				bool addressExists =false;
-//
-//				if(head_client_address!=NULL){
-//
-//					struct connected_client_address *temp2 = head_client_address;
-//
-//					while(temp2!=NULL){
-//						if(strcmp(temp2->client_sockaddress,ipAddressSocket) == 0){
-//							addressExists = true;
-//						}
-//						temp2 = temp2->next;
-//					}
-//
-//				}
-//
-//				if(addressExists){
-//					printf("Continuing..\n");
-//					continue;
-//				}
+				ipAddressSocket = getSocketAddress(IPClient);
 
-//				struct connected_client_address *client_sock_address = (struct connected_client_address*)malloc(sizeof(struct connected_client_address));
-//
-//				strcpy(client_sock_address->client_sockaddress,ipAddressSocket);
-//
-//				if(head_client_address == NULL){
-//					head_client_address = client_sock_address;
-//					temp_client_address = head_client_address;
-//				}else{
-//					temp_client_address->next=client_sock_address;
-//					temp_client_address = client_sock_address;
-//					temp_client_address->next = NULL;
-//				}
+				/*
+				 *  If the client is already connected then this is datagram
+				 *  is a part of retransmission hence we will ignore this
+				 *  connection request.
+				 */
+				if(isClientConnected(head_client_address,ipAddressSocket)){
+						continue;
+				}
+
+				printf("Came inside socket\n");
 
 				if((pid = fork()) == 0){
 					printf("forked a child and handled client connection\n");
 					doFileTransfer(temp,IPClient);
 
 				}else if(pid > 0){
-						// have to use the PID for tracking
-						sprintf(temp_client_address->child_pid,"%d",pid);
+
+					struct connected_client_address *client_sock_address = (struct connected_client_address*)malloc(sizeof(struct connected_client_address));
+
+					strcpy(client_sock_address->client_sockaddress,ipAddressSocket);
+					// have to use the PID for removing the entry for this list.
+					sprintf(client_sock_address->child_pid,"%d",pid);
+
+					printf("childPID %d\n",pid);
+
+					if(head_client_address == NULL){
+						head_client_address = client_sock_address;
+						temp_client_address = head_client_address;
+					}else{
+						temp_client_address->next=client_sock_address;
+						temp_client_address = client_sock_address;
+						temp_client_address->next = NULL;
+					}
 				}
 			}
 			temp = temp->next;
@@ -143,6 +139,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	char IPServer[128];
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
+	struct sockaddr_in networkMaskAddr;
+	int optval=1;
+	unsigned long matchNumber=0;
+	struct dg_payload pload;
 
 	inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
 
@@ -151,15 +151,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	Bind(conn_sockfd,(SA *)&serverAddr,sizeof(serverAddr));
 
-	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
-
-	int optval=1;
-
-	struct sockaddr_in networkMaskAddr;
-
 	inet_pton(AF_INET,sock_info->network_mask,&networkMaskAddr.sin_addr);
-
-	unsigned long matchNumber=0;
 
 	getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,&matchNumber);
 
@@ -168,8 +160,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}
 
-	struct dg_payload pload;
-
+	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 	memset(&pload,0,sizeof(pload));
 	pload.portNumber = htons(serverAddr.sin_port);
 	pload.seq_number = get_seq_num();
@@ -180,8 +171,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	if(connect(conn_sockfd,(SA *)&IPClient,sizeof(IPClient)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
-
-	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
 	inet_ntop(AF_INET,&serverAddr.sin_addr,IPServer,sizeof(IPServer));
 
@@ -204,11 +193,29 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			k++;
 		}
 	}
+	close(conn_sockfd);
+	printf("Exiting child\n");
+	exit(0);
 }
 
-int get_seq_num()
-{
+int get_seq_num(){
 	seq_num++;
 	return seq_num;
+}
+
+/**
+ * Handler for SIGCHLD signal.
+ */
+void sigchild_handler(int signum){
+
+	int stat;
+	pid_t pid;
+
+	printf("Came into signal handler\n");
+//	wait(&pid);
+	while((pid = waitpid(-1,&stat,WNOHANG)) > 0){
+		printf("Child Terminated with PID :%d\n",pid);
+		removeClientAddrFromList(pid,&head_client_address);
+	}
 }
 

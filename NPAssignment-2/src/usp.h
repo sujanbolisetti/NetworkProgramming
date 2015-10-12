@@ -131,6 +131,11 @@ Ioctl(int fd, int request, void *arg);
 bool Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
 bool Sendto(int , struct dg_payload *, ssize_t , int ,  struct sockaddr *, socklen_t );
 
+void removeClientAddrFromList(int child_pid, struct connected_client_address **head);
+
+char* getSocketAddress(struct sockaddr_in IPClient);
+
+bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
 // UDP packet types
 enum PACKET_TYPE

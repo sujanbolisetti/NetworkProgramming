@@ -124,4 +124,61 @@ int getMaxFD(struct binded_sock_info *head){
 	return maxfd;
 }
 
+bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket){
+
+	struct connected_client_address *temp = head;
+	bool addressExists =  false;
+
+	while(temp!=NULL){
+		if(strcmp(temp->client_sockaddress,ipAddressSocket) == 0){
+			addressExists = true;
+		}
+		temp = temp->next;
+	}
+	return addressExists;
+}
+
+
+char* getSocketAddress(struct sockaddr_in IPClient){
+
+	char portNumber[24];
+	char *ipAddressSocket = (char *)malloc(10*sizeof(char));
+
+	inet_ntop(AF_INET,&IPClient.sin_addr,ipAddressSocket,128);
+
+	sprintf(portNumber,"%d",ntohs(IPClient.sin_port));
+
+	strcat(ipAddressSocket,":");
+	strcat(ipAddressSocket,portNumber);
+
+	return ipAddressSocket;
+}
+
+void removeClientAddrFromList(int child_pid, struct connected_client_address **head){
+	char sChild_pid[256];
+	sprintf(sChild_pid,"%d",child_pid);
+	struct connected_client_address *prev = *head;
+	struct connected_client_address *temp = (*head) -> next;
+	int present = 0;
+
+	if(strcmp(temp->child_pid, sChild_pid) == 0)
+	{
+			*head = (*head) -> next;
+			free(prev);
+			return;
+	}
+
+	while(temp != NULL)
+	{
+			if(strcmp(temp->child_pid, sChild_pid) == 0)
+			{
+					prev -> next = temp -> next;
+					free(temp);
+					return;
+			}
+			prev = temp;
+			temp = temp -> next;
+	}
+}
+
 
