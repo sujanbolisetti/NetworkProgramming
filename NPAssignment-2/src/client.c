@@ -205,8 +205,14 @@ int main(int argc,char **argv){
 		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
 
 		if(strcmp(pload.buff,"DONE") == 0){
-			printf("Done with the file transfer\n");
 			print=true;
+			int seq = pload.seq_number;
+			memset(&pload,0,sizeof(pload));
+			pload.ts=ts;
+			pload.ack = seq+1;
+			pload.windowSize = windowSize - i;
+			i++;
+			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 			goto stdout;
 		}
 
@@ -227,8 +233,10 @@ int main(int argc,char **argv){
 
 					printf("%s\n",data_buff[j]);
 				}
-				if(print)
+				if(print){
+					printf("Done with the file transfer\n");
 					break;
+				}
 			}
 	}
 }
