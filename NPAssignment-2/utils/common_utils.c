@@ -188,8 +188,9 @@ struct Node * BuildCircularLinkedList(struct Node *head,int size){
 	printf("came into BuildCircularLinkedList with size :%d\n",size);
 
 	for(i=0;i<size;i++){
-		new_node = (struct Node *)malloc(sizeof(struct Node *));
+		new_node = (struct Node *)malloc(sizeof(struct Node));
 		new_node->ack =-1;
+		new_node->ind = i;
 
 		if(head == NULL){
 			head = new_node;
@@ -202,19 +203,34 @@ struct Node * BuildCircularLinkedList(struct Node *head,int size){
 
 	temp->next = head;
 
+	temp=head;
+
+	while(temp->next!=head){
+		printf("Index :%d\n",temp->ind);
+		temp= temp->next;
+	}
+
 	return head;
 
 }
 
-void populateDataList(struct Node *head,int fd){
+void populateDataList(struct Node *sent,int fd,
+			int windowSize,struct Node* ackNode){
 
-	char buff[480];
+	char buff[PACKET_SIZE];
 	int n;
-	struct Node *temp=head;
+	struct Node *temp=sent;
 
-	while(temp!=NULL){
+	if(temp!=NULL){
+		printf("sent not NULL\n");
+	}
+
+	printf("Before the populate loop\n");
+	while(windowSize-- && temp!=ackNode){
+		printf("Entered the populate loop\n");
+
 		again:
-			if((n=read(fd,buff,sizeof(buff))) < 0){
+			if((n=read(fd,buff,sizeof(buff)-1)) < 0){
 				if(errno == EINTR){
 					goto again;
 				}else{
@@ -223,8 +239,15 @@ void populateDataList(struct Node *head,int fd){
 				}
 			}else if(n==0){
 				printf("EOF reached\n");
+				temp->type = FIN;
+				printf("Changed to FIN\n");
 				break;
 			}
+
+			printf("value of n : %d\n",n);
+
+			buff[n] = '\0';
+			temp->type = PAYLOAD;
 			strcpy(temp->buff,buff);
 			printf("data read :%s\n",buff);
 			temp->ack = 0;

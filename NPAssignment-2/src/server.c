@@ -157,8 +157,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	struct dg_payload pload;
 	struct sigaction new_action, old_action;
 	uint32_t q_sent = 0,q_acked = 0,q_rear = 0,window_size,cwnd,ssthresh;
-	struct Node *headNode,*tempNode;
+	struct Node *headNode=NULL,*sentNode;
 	FILE *fp;
+	int syn_flag = 0;
 
 	if (rttinit == 0) {
 		rtt_init(&rttinfo);		/* first time we're called */
@@ -262,11 +263,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	int fd = open(file_name,O_RDONLY);
 
-	populateDataList(headNode,fd);
+	/**
+	 *  Ackindex -> 1
+	 *  Initial CWND -> 1
+	 */
+	populateDataList(headNode,fd,1,NULL);
 
-	tempNode = headNode;
+	sentNode = headNode;
 
-	struct Node *temp2 = headNode;
+	struct Node *ackNode = NULL;
 
 	for(;;){
 
@@ -275,40 +280,34 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		send:
 			size = min(window_size,cwnd);
 
+			if(ackNode != NULL && !syn_flag){
+				populateDataList(sentNode,fd,size,ackNode);
+			}
+
+//			alarm(0);
 			alarm(rtt_start(&rttinfo)/1000);
 
-			for(i=0;i<size;i++){
+			printf("Send once again\n");
+			for(i=0;i<size && !syn_flag && sentNode != ackNode ;i++){
 
+				printf("Enter once again\n");
 				memset(&pload,0,sizeof(pload));
 
-			 loadagain:
-					if(tempNode!=NULL){
-
-						if(tempNode->ack == -1 || tempNode->ack > 0){
-							// have to close as the file data is completed
-							printf("file transfer completed\n");
-							strcpy(pload.buff,"DONE");
-							sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
-							goto receive;
-						}
-
-						pload.seq_number = seqNum++;
-						pload.ts=rtt_ts(&rttinfo);
-						strcpy(pload.buff,tempNode->buff);
-						tempNode->seqNum = pload.seq_number;
-					}else{
-						populateDataList(headNode,fd);
-						tempNode = headNode;
-						goto loadagain;
-					}
+				pload.seq_number = seqNum++;
+				if(sentNode->type == FIN){
+					printf("file transfer completed and waiting for ACKs.......\n");
+			     	pload.type = FIN;
+			     	syn_flag = 1;
+				 }else{
+					 strcpy(pload.buff,sentNode->buff);
+				  }
+				sentNode->seqNum = pload.seq_number;
 
 				senddatagain:
 					pload.ts = rtt_ts(&rttinfo);
 					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-					printf("Sending the data");
-
-					printf("wait time in data :%d\n",rtt_start(&rttinfo));
+					printf("Sent a packet with seqNumber :%d\n",pload.seq_number);
 
 					if (sigsetjmp(jmpbuf, 1) != 0) {
 						printf("received sigalrm retransmitting\n");
@@ -320,11 +319,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						}
 						goto senddatagain;
 					}
+
+					sentNode = sentNode->next;
 				}
 
 			receive:
+				printf("waiting for ack\n");
+				memset(&pload,0,sizeof(pload));
 				Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
-				alarm(0);
+				printf("received the ack with %d\n",pload.ack);
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
 				if(cwnd < ssthresh){
 					cwnd*=2;
@@ -332,23 +335,38 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					cwnd+=1;
 				}
 
-				if(tempNode->ack == -1 || tempNode->ack > 0){
+				if(pload.type==FIN_ACK){
+					// have to send ack and wait TIME_WAIT
+					printf("Received FIN_ACK from client\n");
+					memset(&pload,0,sizeof(pload));
+					pload.type = ACK;
+					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 					goto done;
 				}
 
-				if(temp2->seqNum == pload.ack-1){
-					temp2->ack = temp2->seqNum;
+				if(ackNode == NULL)
+				{
+					ackNode = headNode;
 				}
 
+				if(ackNode->seqNum == pload.ack-1){
+					ackNode->ack = ackNode->seqNum;
+					ackNode= ackNode->next;
+				}else{
+					printf("received wrong ack\n");
+				}
 
+				printf("populated seqNum\n");
 				if(pload.windowSize > 0){
 					window_size = pload.windowSize;
+					printf("window size :%d\n",window_size);
 					goto send;
 				}else{
 					goto receive;
 				}
 	}
 	done:
+		alarm(0);
 		close(conn_sockfd);
 		exit(0);
 }

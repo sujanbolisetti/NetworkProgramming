@@ -31,13 +31,15 @@ int main(int argc,char **argv){
 	struct in_addr subnet_addr;
 	unsigned long maxMatch=0;
 	bool isLoopBack=false;
-	char buff[480];
+	char buff[PACKET_SIZE];
 	struct dg_payload pload;
 	struct sigaction new_action, old_action;
 	//struct msghdr msgsend;
 	//struct iovec iovsend[2];
 	uint32_t seqNum=0;
-	char data_buff[40][480];
+	float prob;
+	int randomSeed;
+
 
 
 	fp=fopen("client.in","r");
@@ -45,6 +47,10 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%d",&portNumber);
 	Fscanf(fp,"%s",fileName);
 	Fscanf(fp,"%d",&windowSize);
+	Fscanf(fp,"%d",&randomSeed);
+	Fscanf(fp,"%f",&prob);
+
+	char data_buff[windowSize][PACKET_SIZE];
 
 	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
@@ -199,46 +205,69 @@ int main(int argc,char **argv){
 	int i=0,j=0,size=40;
 	bool print= false;
 
+	/**
+	 * TODO:
+	 *  Have to do reordering
+	 *  seperate thread to read the buffer.
+	 */
 	for(;;){
 
 		memset(&pload,0,sizeof(pload));
 		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
 
-		if(strcmp(pload.buff,"DONE") == 0){
+//		printf("%s\n",pload.buff);
+//
+//		pload.buff[PACKET_SIZE] = '\0';
+		if(pload.type == FIN){
 			print=true;
 			int seq = pload.seq_number;
 			memset(&pload,0,sizeof(pload));
 			pload.ts=ts;
 			pload.ack = seq+1;
-			pload.windowSize = windowSize - i;
-			i++;
+			pload.type = FIN_ACK;
+			printf("Sent FinACK");
 			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 			goto stdout;
+			//break;
 		}
 
-		strcpy(data_buff[i%40],pload.buff);
-		int ts = pload.ts;
-		int seq = pload.seq_number;
-		memset(&pload,0,sizeof(pload));
-		pload.ts=ts;
-		pload.ack = seq+1;
-		pload.windowSize = windowSize - i;
-		i++;
-		sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+		if(!is_in_limits(prob)){
+			strcpy(data_buff[i%40],pload.buff);
+			int ts = pload.ts;
+			int seq = pload.seq_number;
+			memset(&pload,0,sizeof(pload));
+			pload.ts=ts;
+			pload.ack = seq+1;
+			pload.windowSize = windowSize - i;
+			pload.type = ACK;
+			i++;
+			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+		}
 
 		stdout:
-			if(pload.windowSize == 0 || print){
+			if(i%40 == 0 || print){
 
 				for(j=0;j<i;j++){
 
 					printf("%s\n",data_buff[j]);
+//					memset(&pload,0,sizeof(pload));
+//					pload.windowSize =40;
+//					pload.ack = seq+1;
+//
+//					sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 				}
-				if(print){
+				if(pload.type == FIN_ACK){
 					printf("Done with the file transfer\n");
+					memset(&pload,0,sizeof(pload));
+					recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+					printf("Server Child Closed\n");
+					close(sockfd);
 					break;
 				}
+				i=0;
 			}
 	}
+
 }
 
 void

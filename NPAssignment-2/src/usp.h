@@ -99,9 +99,11 @@ struct flow_metadata{
 
 struct Node{
 	int ack;
-	char buff[480];
+	char buff[PACKET_SIZE];
 	int seqNum;
+	int ind;
 	struct Node *next;
+	uint32_t type;
 };
 
 int		Accept(int, SA *, socklen_t *);
@@ -161,9 +163,15 @@ char* getSocketAddress(struct sockaddr_in IPClient);
 
 bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
-void populateDataList(struct Node *head,int fd);
+void populateDataList(struct Node *sent,int fd,
+			int windowSize,struct Node *ack_node);
 
 struct Node * BuildCircularLinkedList(struct Node *head,int size);
+
+unsigned int rand_interval(unsigned int, unsigned int);
+
+unsigned int is_in_limits(float);
+
 
 // UDP packet types
 enum PACKET_TYPE
