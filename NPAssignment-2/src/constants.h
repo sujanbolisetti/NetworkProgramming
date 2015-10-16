@@ -16,5 +16,9 @@
 #define ACK 1
 #define PAYLOAD 2
 
+#define SLOWSTART 1
+#define FASTRESTRANSMIT 2
+
+
 
 #endif /* CONSTANTS_H_ */

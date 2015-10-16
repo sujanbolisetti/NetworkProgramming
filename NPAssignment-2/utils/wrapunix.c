@@ -17,3 +17,11 @@ Ioctl(int fd, int request, void *arg)
 	return(n);	/* streamio of I_LIST returns value */
 }
 
+void
+Gettimeofday(struct timeval *tv, void *foo)
+{
+	if (gettimeofday(tv, foo) == -1)
+		printf("gettimeday error \n");
+	return;
+}
+

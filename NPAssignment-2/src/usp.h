@@ -29,6 +29,8 @@
 
 #include <sys/select.h>
 
+#include <setjmp.h>
+
 #include<string.h>
 
 #include<fcntl.h>
@@ -43,6 +45,8 @@
 
 # include <sys/ioctl.h>
 
+#include	"unprtt.h"
+
 // #include <sys/sockio.h>
 
 #ifdef	HAVE_PTHREAD_H
@@ -53,14 +57,21 @@
 
 #include "constants.h"
 
-struct binded_sock_info{
+#define PACKET_SIZE 512
 
+#define SA struct sockaddr
+
+#define	min(a,b)	((a) < (b) ? (a) : (b))
+#define	max(a,b)	((a) > (b) ? (a) : (b))
+
+#define	FILE_MODE	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+
+struct binded_sock_info{
 	int sockfd;
 	char ip_address[128];
 	char network_mask[128];
 	char subnet_adress[128];
 	struct binded_sock_info *next;
-
 };
 
 struct connected_client_address{
@@ -70,18 +81,28 @@ struct connected_client_address{
 };
 
 struct dg_payload{
-	int type;
-	int seq_number;
-	int portNumber;
-	char buff[MAXLINE];
+	uint32_t type;
+	uint32_t seq_number;
+	uint32_t ack;
+	uint32_t ts;
+	uint32_t windowSize;
+	char buff[PACKET_SIZE];
 };
 
-#define SA struct sockaddr
+struct flow_metadata{
+	uint32_t slidingWindow;
+	uint32_t slidingWindowStart;
+	uint32_t slidingWindowEnd;
+	uint32_t cwnd;
+	uint32_t ssthresh;
+};
 
-#define	min(a,b)	((a) < (b) ? (a) : (b))
-#define	max(a,b)	((a) > (b) ? (a) : (b))
-
-#define	FILE_MODE	(S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH)
+struct Node{
+	int ack;
+	char buff[480];
+	int seqNum;
+	struct Node *next;
+};
 
 int		Accept(int, SA *, socklen_t *);
 void	Bind(int, const SA *, socklen_t);
@@ -104,6 +125,8 @@ void* echo_service(void* arg);
 
 void sigchild_handler(int signum);
 
+void sig_alrm(int signo);
+
 char *
 Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
 
@@ -111,7 +134,8 @@ void Getpeername(int sockfd,struct sockaddr *sa, int* length);
 
 void Getsockname(int sockfd,struct sockaddr *sa, int* length);
 
-void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in);
+void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClient,
+		struct flow_metadata *flow_data, char *file_name);
 
 void Fscanf(FILE *fp, char *format, void *data);
 
@@ -128,7 +152,7 @@ void printInterfaceDetails(struct binded_sock_info *head);
 int
 Ioctl(int fd, int request, void *arg);
 
-bool Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
+void Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
 bool Sendto(int , struct dg_payload *, ssize_t , int ,  struct sockaddr *, socklen_t );
 
 void removeClientAddrFromList(int child_pid, struct connected_client_address **head);
@@ -137,11 +161,20 @@ char* getSocketAddress(struct sockaddr_in IPClient);
 
 bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
+void populateDataList(struct Node *head,int fd);
+
+struct Node * BuildCircularLinkedList(struct Node *head,int size);
+
 // UDP packet types
 enum PACKET_TYPE
 {
 	ack,
 	pay_load
+};
+
+enum CONGESTION_TYPE{
+	slowstart,
+	fast_
 };
 
 #endif /* USP_H_ */

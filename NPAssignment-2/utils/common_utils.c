@@ -158,7 +158,7 @@ void removeClientAddrFromList(int child_pid, struct connected_client_address **h
 	char sChild_pid[256];
 	sprintf(sChild_pid,"%d",child_pid);
 	struct connected_client_address *prev = *head;
-	struct connected_client_address *temp = (*head) -> next;
+	struct connected_client_address *temp = *head;
 	int present = 0;
 
 	if(strcmp(temp->child_pid, sChild_pid) == 0)
@@ -179,6 +179,58 @@ void removeClientAddrFromList(int child_pid, struct connected_client_address **h
 			prev = temp;
 			temp = temp -> next;
 	}
+}
+
+struct Node * BuildCircularLinkedList(struct Node *head,int size){
+
+	struct Node *new_node,*temp;
+	int i;
+	printf("came into BuildCircularLinkedList with size :%d\n",size);
+
+	for(i=0;i<size;i++){
+		new_node = (struct Node *)malloc(sizeof(struct Node *));
+		new_node->ack =-1;
+
+		if(head == NULL){
+			head = new_node;
+			temp = new_node;
+		}else{
+			temp->next = new_node;
+			temp = new_node;
+		}
+	}
+
+	temp->next = head;
+
+	return head;
+
+}
+
+void populateDataList(struct Node *head,int fd){
+
+	char buff[480];
+	int n;
+	struct Node *temp=head;
+
+	while(temp!=NULL){
+		again:
+			if((n=read(fd,buff,sizeof(buff))) < 0){
+				if(errno == EINTR){
+					goto again;
+				}else{
+					printf("Fread error :%s\n",strerror(errno));
+					break;
+				}
+			}else if(n==0){
+				printf("EOF reached\n");
+				break;
+			}
+			strcpy(temp->buff,buff);
+			printf("data read :%s\n",buff);
+			temp->ack = 0;
+			temp = temp->next;
+	}
+
 }
 
 

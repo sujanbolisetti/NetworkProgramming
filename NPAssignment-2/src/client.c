@@ -7,15 +7,19 @@
 #include "usp.h"
 #include  "unpifi.h"
 
-int seq_num = 0;
-int get_seq_num();
+#define	RTT_DEBUG
+
+static struct rtt_info   rttinfo;
+static int	rttinit = 0;
+static sigjmp_buf jmpbuf;
 
 int main(int argc,char **argv){
 
 	FILE *fp;
 	char IPServer[128];
 	int portNumber,sockfd;
-	char fileName[120], buff[MAXLINE];
+	char fileName[120];
+	uint32_t windowSize;
 	struct sockaddr_in *clientAddr;
 	struct ifi_info *if_head,*if_temp;
 	char clientIP[128];
@@ -27,17 +31,20 @@ int main(int argc,char **argv){
 	struct in_addr subnet_addr;
 	unsigned long maxMatch=0;
 	bool isLoopBack=false;
+	char buff[480];
+	struct dg_payload pload;
+	struct sigaction new_action, old_action;
+	//struct msghdr msgsend;
+	//struct iovec iovsend[2];
+	uint32_t seqNum=0;
+	char data_buff[40][480];
 
 
-	if(argc < 2){
-		printf("Kindly enter the input file name\n");
-		exit(0);
-	}
-
-	fp=fopen(argv[1],"r");
+	fp=fopen("client.in","r");
 	Fscanf(fp,"%s",IPServer);
 	Fscanf(fp,"%d",&portNumber);
 	Fscanf(fp,"%s",fileName);
+	Fscanf(fp,"%d",&windowSize);
 
 	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
@@ -79,6 +86,7 @@ int main(int argc,char **argv){
 			}
 			temp=temp->next;
 		}
+		printf("Server is not local to the client\n");
 	}else{
 		printf("server is in local\n");
 		setsockopt(sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
@@ -98,6 +106,7 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
+
 	struct sockaddr_in peerAddress;
 
 	int peerAddrLength = sizeof(peerAddress);
@@ -108,26 +117,62 @@ int main(int argc,char **argv){
 
 	printf("Connecting to server running on IPAddress :%s with portNumber :%d\n",IPServer,ntohs(peerAddress.sin_port));
 
-	struct dg_payload pload;
+	if (rttinit == 0) {
+		rtt_init(&rttinfo);		/* first time we're called */
+		rttinit = 1;
+		rtt_d_flag = 1;
+	}
 
 	memset(&pload,0,sizeof(pload));
+
+	new_action.sa_handler = sig_alrm;
+	sigemptyset(&new_action.sa_mask);
+	new_action.sa_flags = 0;
+	sigaction(SIGALRM,NULL,&old_action);
+
+	if(old_action.sa_handler != SIG_IGN){
+		printf("New Action Set\n");
+		sigaction(SIGALRM,&new_action,&old_action);
+	}
 
 	strcpy(pload.buff,fileName);
 	pload.type = PAYLOAD;
-	pload.seq_number = get_seq_num();
-	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+	pload.seq_number = seqNum++;
+	pload.windowSize = windowSize;
 
-	printf("Client has sent the file Name\n");
+	sendagain:
+		pload.ts = rtt_ts(&rttinfo);
+		sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-	memset(&pload,0,sizeof(pload));
-	recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+		printf("wait time :%d\n",rtt_start(&rttinfo));
 
-	printf("New Emphemeral PortNumber of the Server %d\n",pload.portNumber);
+		alarm(rtt_start(&rttinfo)/1000);
 
+		if (sigsetjmp(jmpbuf, 1) != 0) {
+			printf("received sigalrm retransmitting\n");
+			if (rtt_timeout(&rttinfo) < 0) {
+				printf("Reached Maximum retransmission attempts : No response from the server giving up\n");
+				rttinit = 0;	/* reinit in case we're called again */
+				errno = ETIMEDOUT;
+				return(-1);
+			}
+			goto sendagain;
+		}
+
+
+	printf("Client has sent the file Name.. Awaiting for the child port number from the server\n");
+
+	Recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+
+	alarm(0);
+
+	int serverChildPortNumber = atoi(pload.buff);
+
+	printf("New Emphemeral PortNumber of the Server Child %d\n",serverChildPortNumber);
 	close(sockfd);
 
 	struct sockaddr_in newServerAddr;
-	newServerAddr.sin_port = htons(pload.portNumber);
+	newServerAddr.sin_port = htons(serverChildPortNumber);
 	newServerAddr.sin_addr.s_addr = serverAddr.sin_addr.s_addr;
 	newServerAddr.sin_family = AF_INET;
 
@@ -139,24 +184,58 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	printf("sending ack that sockets set\n");
+	uint32_t ts =  pload.ts;
+
 	memset(&pload,0,sizeof(pload));
-	strcpy(pload.buff, "DONE");
 	pload.type = ACK;
-	pload.seq_number = get_seq_num();
+	pload.ts = ts;
+
+	pload.seq_number = seqNum++;
+
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-	int k = 0;
-	while(k < 10) {
+	printf("Has sent the ack for the port number\n");
+
+	int i=0,j=0,size=40;
+	bool print= false;
+
+	for(;;){
+
 		memset(&pload,0,sizeof(pload));
 		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
-		printf("received number is %d\n",ntohs(pload.portNumber));
-		k++;
 
+		if(strcmp(pload.buff,"DONE") == 0){
+			printf("Done with the file transfer\n");
+			print=true;
+			goto stdout;
+		}
+
+		strcpy(data_buff[i%40],pload.buff);
+		int ts = pload.ts;
+		int seq = pload.seq_number;
+		memset(&pload,0,sizeof(pload));
+		pload.ts=ts;
+		pload.ack = seq+1;
+		pload.windowSize = windowSize - i;
+		i++;
+		sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+
+		stdout:
+			if(pload.windowSize == 0 || print){
+
+				for(j=0;j<i;j++){
+
+					printf("%s\n",data_buff[j]);
+				}
+				if(print)
+					break;
+			}
 	}
 }
 
-int get_seq_num()
-{
-	return seq_num++;
+void
+sig_alrm(int signo){
+	printf("received the sigalrm\n");
+	siglongjmp(jmpbuf,1);
 }
+

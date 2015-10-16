@@ -72,8 +72,14 @@ Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 {
 	int		n;
 
-	if ( (n = select(nfds, readfds, writefds, exceptfds, timeout)) < 0)
-		printf("select error %s\n",strerror(errno));
+	again:
+		if ( (n = select(nfds, readfds, writefds, exceptfds, timeout)) < 0){
+			if(errno == EINTR){
+				goto again;
+			}else{
+				printf("select error %s\n",strerror(errno));
+			}
+		}
 	return(n);		/* can return 0 on timeout */
 }
 
@@ -118,14 +124,23 @@ void sendAck(int socket, int seq_num, struct sockaddr *sa)
 	printf("Ack sent to seq number:%d\n", ack.seq_number);
 }
 
-bool Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t *socklen)
+void Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t *socklen)
 {
-	printf("Packet received seq number:");
-	recvfrom(socket, pload, size, flags, sa, socklen);
-	printf("%d\n", pload->seq_number);
+	//printf("Packet received seq number:");
 
-	sendAck(socket, pload->seq_number, sa);
-	return true;
+	int n;
+	again:
+		if((n=recvfrom(socket, pload, size, flags, sa, socklen)) < 0){
+			if(errno == EINTR){
+				goto again;
+			}else{
+				printf("Error in recvfrom :%s",strerror(errno));
+			}
+		}
+	//printf("%d\n", pload->seq_number);
+
+	//sendAck(socket, pload->seq_number, sa);
+
 }
 
 
