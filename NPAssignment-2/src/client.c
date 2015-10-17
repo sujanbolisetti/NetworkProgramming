@@ -32,7 +32,8 @@ int main(int argc,char **argv){
 	unsigned long maxMatch=0;
 	bool isLoopBack=false;
 	char buff[PACKET_SIZE];
-	struct dg_payload pload;
+	struct dg_payload recv_pload;
+	struct dg_payload send_pload;
 	struct sigaction new_action, old_action;
 	//struct msghdr msgsend;
 	//struct iovec iovsend[2];
@@ -129,7 +130,7 @@ int main(int argc,char **argv){
 		rtt_d_flag = 1;
 	}
 
-	memset(&pload,0,sizeof(pload));
+	memset(&send_pload,0,sizeof(send_pload));
 
 	new_action.sa_handler = sig_alrm;
 	sigemptyset(&new_action.sa_mask);
@@ -141,14 +142,14 @@ int main(int argc,char **argv){
 		sigaction(SIGALRM,&new_action,&old_action);
 	}
 
-	strcpy(pload.buff,fileName);
-	pload.type = PAYLOAD;
-	pload.seq_number = seqNum++;
-	pload.windowSize = windowSize;
+	strcpy(send_pload.buff,fileName);
+	send_pload.type = PAYLOAD;
+	send_pload.seq_number = seqNum++;
+	send_pload.windowSize = windowSize;
 
 	sendagain:
-		pload.ts = rtt_ts(&rttinfo);
-		sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+		send_pload.ts = rtt_ts(&rttinfo);
+		sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
 
 		printf("wait time :%d\n",rtt_start(&rttinfo));
 
@@ -168,11 +169,12 @@ int main(int argc,char **argv){
 
 	printf("Client has sent the file Name.. Awaiting for the child port number from the server\n");
 
-	Recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+	memset(&recv_pload,0,sizeof(recv_pload));
+	Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 
 	alarm(0);
 
-	int serverChildPortNumber = atoi(pload.buff);
+	int serverChildPortNumber = atoi(recv_pload.buff);
 
 	printf("New Emphemeral PortNumber of the Server Child %d\n",serverChildPortNumber);
 	close(sockfd);
@@ -190,15 +192,15 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	uint32_t ts =  pload.ts;
+	uint32_t ts =  recv_pload.ts;
 
-	memset(&pload,0,sizeof(pload));
-	pload.type = ACK;
-	pload.ts = ts;
+	memset(&send_pload,0,sizeof(send_pload));
+	send_pload.type = ACK;
+	send_pload.ts = ts;
 
-	pload.seq_number = seqNum++;
+	send_pload.seq_number = seqNum++;
 
-	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
 
 	printf("Has sent the ack for the port number\n");
 
@@ -212,36 +214,34 @@ int main(int argc,char **argv){
 	 */
 	for(;;){
 
-		memset(&pload,0,sizeof(pload));
-		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+		memset(&recv_pload,0,sizeof(recv_pload));
+		recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 
-//		printf("%s\n",pload.buff);
-//
-//		pload.buff[PACKET_SIZE] = '\0';
-		if(pload.type == FIN){
+		if(recv_pload.type == FIN){
 			print=true;
-			int seq = pload.seq_number;
-			memset(&pload,0,sizeof(pload));
-			pload.ts=ts;
-			pload.ack = seq+1;
-			pload.type = FIN_ACK;
-			printf("Sent FinACK");
-			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			int seq = recv_pload.seq_number;
+			memset(&send_pload,0,sizeof(send_pload));
+			send_pload.ts=ts;
+			send_pload.ack = seq+1;
+			send_pload.type = FIN_ACK;
+			printf("Sent FIN_ACK");
+			sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
 			goto stdout;
 			//break;
 		}
 
-		if(!is_in_limits(prob)){
-			strcpy(data_buff[i%40],pload.buff);
-			int ts = pload.ts;
-			int seq = pload.seq_number;
-			memset(&pload,0,sizeof(pload));
-			pload.ts=ts;
-			pload.ack = seq+1;
-			pload.windowSize = windowSize - i;
-			pload.type = ACK;
+		//if(!is_in_limits(prob))
+		{
+			strcpy(data_buff[i%40],recv_pload.buff);
+			int ts = recv_pload.ts;
+			int seq = recv_pload.seq_number;
+			memset(&recv_pload,0,sizeof(recv_pload));
+			recv_pload.ts=ts;
+			recv_pload.ack = seq+1;
+			recv_pload.windowSize = windowSize - i;
+			recv_pload.type = ACK;
 			i++;
-			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			sendto(sockfd,(void *)&recv_pload,sizeof(recv_pload),0,NULL,0);
 		}
 
 		stdout:
@@ -256,10 +256,10 @@ int main(int argc,char **argv){
 //
 //					sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 				}
-				if(pload.type == FIN_ACK){
+				if(send_pload.type == FIN_ACK){
 					printf("Done with the file transfer\n");
-					memset(&pload,0,sizeof(pload));
-					recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+					memset(&recv_pload,0,sizeof(recv_pload));
+					recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 					printf("Server Child Closed\n");
 					close(sockfd);
 					break;
