@@ -181,15 +181,15 @@ void removeClientAddrFromList(int child_pid, struct connected_client_address **h
 	}
 }
 
-struct Node * BuildCircularLinkedList(struct Node *head,int size){
+struct Node * BuildCircularLinkedList(int size){
 
-	struct Node *new_node,*temp;
+	struct Node *new_node,*temp,*head=NULL;
 	int i;
 	printf("came into BuildCircularLinkedList with size :%d\n",size);
 
 	for(i=0;i<size;i++){
 		new_node = (struct Node *)malloc(sizeof(struct Node));
-		new_node->ack =-1;
+		new_node->ack =0;
 		new_node->ind = i;
 
 		if(head == NULL){
@@ -201,33 +201,44 @@ struct Node * BuildCircularLinkedList(struct Node *head,int size){
 		}
 	}
 
-	temp->next = head;
-
-	temp=head;
-
-	while(temp->next!=head){
-		printf("Index :%d\n",temp->ind);
-		temp= temp->next;
+	if(size>0){
+		temp->next = head;
 	}
 
+	printList(head);
 	return head;
-
 }
 
-void populateDataList(struct Node *sent,int fd,
+void printList(struct Node *head){
+
+	printf("Printing circular list : ");
+	struct Node *temp = head;
+	if(temp == NULL){
+		return;
+	}
+	else{
+		while(temp->next != head)
+		{
+			printf("%d ", temp->ind);
+			temp = temp->next;
+		}
+	}
+	printf("\n");
+}
+
+bool populateDataList(struct Node *sent,int fd,
 			int windowSize,struct Node* ackNode){
 
 	char buff[PACKET_SIZE];
 	int n;
 	struct Node *temp=sent;
 
-	if(temp!=NULL){
-		printf("sent not NULL\n");
-	}
+	while(windowSize--){
 
-	printf("Before the populate loop\n");
-	while(windowSize-- && temp!=ackNode){
-		printf("Entered the populate loop\n");
+		if((ackNode==NULL && sent->ind == SLIDING_WINDOW-1) || (ackNode!=NULL && ackNode == sent->next)){
+				printf("Circular Buffer is full\n");
+				return true;
+		}
 
 		again:
 			if((n=read(fd,buff,sizeof(buff)-1)) < 0){
@@ -248,11 +259,14 @@ void populateDataList(struct Node *sent,int fd,
 
 			buff[n] = '\0';
 			temp->type = PAYLOAD;
+			memset(temp->buff,0,sizeof(temp->buff));
 			strcpy(temp->buff,buff);
-			printf("data read :%s\n",buff);
+			//printf("data read :%s\n",buff);
 			temp->ack = 0;
 			temp = temp->next;
 	}
+
+	return false;
 
 }
 

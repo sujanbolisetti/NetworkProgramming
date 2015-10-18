@@ -17,12 +17,28 @@
 #define PAYLOAD 2
 #define FIN 4
 #define FIN_ACK 8
+#define USED 16
 
 
 #define SLOWSTART 1
 #define FASTRESTRANSMIT 2
 
 #define SLIDING_WINDOW 40
+
+#define MAX_DUPLICATE_ACK_COUNT 3
+
+// States
+#define SLOW_START 1
+#define CONGESTION_AVOIDANCE 2
+#define FAST_RECOVERY 4
+
+// events
+#define TIME_OUT 1
+#define DUPLICATE_3_ACK 2
+#define DUPLICATE_ACK 4
+#define NEW_ACK 8
+
+
 
 
 

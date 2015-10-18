@@ -45,6 +45,8 @@
 
 # include <sys/ioctl.h>
 
+#include<math.h>
+
 #include	"unprtt.h"
 
 // #include <sys/sockio.h>
@@ -163,15 +165,18 @@ char* getSocketAddress(struct sockaddr_in IPClient);
 
 bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
-void populateDataList(struct Node *sent,int fd,
+bool populateDataList(struct Node *sent,int fd,
 			int windowSize,struct Node *ack_node);
 
-struct Node * BuildCircularLinkedList(struct Node *head,int size);
+struct Node * BuildCircularLinkedList(int size);
+void printList(struct Node *head);
 
 unsigned int rand_interval(unsigned int, unsigned int);
 
 unsigned int is_in_limits(float);
 
+void
+congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state);
 
 // UDP packet types
 enum PACKET_TYPE

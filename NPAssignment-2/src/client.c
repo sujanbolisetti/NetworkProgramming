@@ -12,6 +12,15 @@
 static struct rtt_info   rttinfo;
 static int	rttinit = 0;
 static sigjmp_buf jmpbuf;
+int server_seq_num = -1;
+
+void sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type);
+int storePacket(struct dg_payload, struct dg_payload *data_temp_buff, int windowSize);
+int getPacket(struct dg_payload*, struct dg_payload *data_temp_buff, int seq_num, int windowSize);
+int is_new_packet_present(struct dg_payload* data_temp_buff, int windowSize);
+void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize);
+int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize);
+int getWindowSize(uint32_t windowSize, int databuff_index, int temp_buff_size);
 
 int main(int argc,char **argv){
 
@@ -20,6 +29,7 @@ int main(int argc,char **argv){
 	int portNumber,sockfd;
 	char fileName[120];
 	uint32_t windowSize;
+	uint32_t WINDOW_SIZE;
 	struct sockaddr_in *clientAddr;
 	struct ifi_info *if_head,*if_temp;
 	char clientIP[128];
@@ -32,15 +42,16 @@ int main(int argc,char **argv){
 	unsigned long maxMatch=0;
 	bool isLoopBack=false;
 	char buff[PACKET_SIZE];
+	int ack_seq=0;
 	struct dg_payload pload;
+	struct dg_payload recv_pload;
 	struct sigaction new_action, old_action;
 	//struct msghdr msgsend;
 	//struct iovec iovsend[2];
 	uint32_t seqNum=0;
 	float prob;
 	int randomSeed;
-
-
+	int required_seq_num = -1;
 
 	fp=fopen("client.in","r");
 	Fscanf(fp,"%s",IPServer);
@@ -51,6 +62,10 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%f",&prob);
 
 	char data_buff[windowSize][PACKET_SIZE];
+	struct dg_payload data_temp_buff[windowSize];
+	WINDOW_SIZE = windowSize;
+
+	initializeTempBuff(data_temp_buff, windowSize);
 
 	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
@@ -152,8 +167,6 @@ int main(int argc,char **argv){
 
 		printf("wait time :%d\n",rtt_start(&rttinfo));
 
-		alarm(rtt_start(&rttinfo)/1000);
-
 		if (sigsetjmp(jmpbuf, 1) != 0) {
 			printf("received sigalrm retransmitting\n");
 			if (rtt_timeout(&rttinfo) < 0) {
@@ -168,11 +181,14 @@ int main(int argc,char **argv){
 
 	printf("Client has sent the file Name.. Awaiting for the child port number from the server\n");
 
-	Recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+	memset(&recv_pload,0,sizeof(recv_pload));
+	Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
+
+	//printf("Received the ack packet with ack number :%d\n",pload.ack);
 
 	alarm(0);
 
-	int serverChildPortNumber = atoi(pload.buff);
+	int serverChildPortNumber = atoi(recv_pload.buff);
 
 	printf("New Emphemeral PortNumber of the Server Child %d\n",serverChildPortNumber);
 	close(sockfd);
@@ -190,19 +206,22 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	uint32_t ts =  pload.ts;
-
+	uint32_t ts =  recv_pload.ts;
+	ack_seq = pload.seq_number;
 	memset(&pload,0,sizeof(pload));
+
 	pload.type = ACK;
 	pload.ts = ts;
+	pload.ack = ack_seq+1;
 
-	pload.seq_number = seqNum++;
+	//sleep(2);
 
 	sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
-	printf("Has sent the ack for the port number\n");
 
-	int i=0,j=0,size=40;
+	printf("Has sent the ack :%d for the port number\n",pload.ack);
+
+	int databuff_index=0,j=0,size=40;
 	bool print= false;
 
 	/**
@@ -210,61 +229,107 @@ int main(int argc,char **argv){
 	 *  Have to do reordering
 	 *  seperate thread to read the buffer.
 	 */
+	int temp_index=0;
 	for(;;){
 
-		memset(&pload,0,sizeof(pload));
-		recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+		memset(&recv_pload,0,sizeof(recv_pload));
+		printf("Client is waiting for data packet\n");
+		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 
-//		printf("%s\n",pload.buff);
-//
-//		pload.buff[PACKET_SIZE] = '\0';
-		if(pload.type == FIN){
+		// drop packet if packet received is less than expected
+		if(server_seq_num != -1 && server_seq_num > pload.seq_number)
+		{
+			continue;
+		}
+
+		printf("Client has received the data packet %d\n", recv_pload.seq_number);
+		if(recv_pload.type == FIN && required_seq_num == -1){
 			print=true;
-			int seq = pload.seq_number;
-			memset(&pload,0,sizeof(pload));
-			pload.ts=ts;
-			pload.ack = seq+1;
-			pload.type = FIN_ACK;
-			printf("Sent FinACK");
-			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+			sendAcknowledgement(sockfd, ts, recv_pload.seq_number+1,
+					getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), FIN_ACK);
 			goto stdout;
-			//break;
 		}
 
-		if(!is_in_limits(prob)){
-			strcpy(data_buff[i%40],pload.buff);
-			int ts = pload.ts;
-			int seq = pload.seq_number;
-			memset(&pload,0,sizeof(pload));
-			pload.ts=ts;
-			pload.ack = seq+1;
-			pload.windowSize = windowSize - i;
-			pload.type = ACK;
-			i++;
-			sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+		int type = ACK;
+		if(!is_in_limits(prob) || required_seq_num != -1)
+		//if(!(recv_pload.seq_number == 2 && temp_index < 3))
+		{
+			if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
+			{
+				memset(data_buff[databuff_index%40],0,PACKET_SIZE);
+				strcpy(data_buff[databuff_index%40],recv_pload.buff);
+				int ts = recv_pload.ts;
+				int seq = recv_pload.seq_number+1;
+				databuff_index++;
+				//sendAcknowledgement(sockfd, ts, seq+1, windowSize - databuff_index, ACK);
+				printf("Entered the loop for packet with seqNum :%d\n",recv_pload.seq_number);
+				if(required_seq_num != -1)
+				{
+					while(getPacket(&recv_pload, data_temp_buff, seq, WINDOW_SIZE))
+					{
+						printf("Packet present in data_temp_buff %d %d\n", recv_pload.seq_number,recv_pload.type);
+						strcpy(data_buff[databuff_index%40],recv_pload.buff);
+						if(recv_pload.type == PAYLOAD){
+							//sendAcknowledgement(sockfd, recv_pload.ts, recv_pload.seq_number+1, windowSize - databuff_index, ACK);
+						}
+						else if(recv_pload.type == FIN){
+							//sendAcknowledgement(sockfd, recv_pload.ts, recv_pload.seq_number+1, windowSize - databuff_index, FIN_ACK);
+							type = FIN_ACK;
+							print=true;
+							break;
+						}
+						memset(&recv_pload, 0, sizeof(recv_pload));
+						databuff_index++;
+						seq++;
+					}
+
+					// checking if any new packets in temp buffer
+					int new;
+					if((new = is_new_packet_present(data_temp_buff, WINDOW_SIZE)))
+					{
+						required_seq_num = seq;
+					}
+					else
+					{
+						required_seq_num = -1;
+					}
+				}
+				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
+			}
+			else
+			{
+				// store in other list and send ack for required packet
+				storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
+				printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
+				sendAcknowledgement(sockfd, ts, required_seq_num, getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+			}
 		}
+		else
+		{
+			temp_index++;
+			printf("Intentionally dropping packet %d\n", recv_pload.seq_number);
+			if(required_seq_num == -1)
+			{
+				required_seq_num = recv_pload.seq_number;
+			}
+		}
+
 
 		stdout:
-			if(i%40 == 0 || print){
+			if(databuff_index%40 == 0 || print){
 
-				for(j=0;j<i;j++){
-
-					printf("%s\n",data_buff[j]);
-//					memset(&pload,0,sizeof(pload));
-//					pload.windowSize =40;
-//					pload.ack = seq+1;
-//
-//					sendto(sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+				for(j=0;j<databuff_index;j++){
+					//printf("data reading : %s\n",data_buff[j]);
 				}
-				if(pload.type == FIN_ACK){
+				if(print){
 					printf("Done with the file transfer\n");
-					memset(&pload,0,sizeof(pload));
-					recvfrom(sockfd,&pload,sizeof(pload),0,NULL,NULL);
+					memset(&recv_pload,0,sizeof(recv_pload));
+					recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 					printf("Server Child Closed\n");
 					close(sockfd);
 					break;
 				}
-				i=0;
+				databuff_index=0;
 			}
 	}
 
@@ -274,5 +339,96 @@ void
 sig_alrm(int signo){
 	printf("received the sigalrm\n");
 	siglongjmp(jmpbuf,1);
+}
+
+void
+sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type)
+{
+	struct dg_payload send_pload;
+	memset(&send_pload,0,sizeof(send_pload));
+	send_pload.ts=ts;
+	send_pload.ack = seq;
+	send_pload.windowSize = windowSize;
+	send_pload.type = type;
+	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
+	server_seq_num = send_pload.seq_number;
+	printf("Sent ack with seq num : %d\n", send_pload.ack);
+}
+
+int getPacket(struct dg_payload *pload, struct dg_payload *data_temp_buff, int seq_num, int windowSize)
+{
+	int i;
+	for(i = 0; i < windowSize; i++)
+	{
+		if(data_temp_buff[i].seq_number == seq_num)
+		{
+			pload->ack = data_temp_buff[i].ack;
+			strcpy(pload->buff, data_temp_buff[i].buff);
+			pload->type = data_temp_buff[i].type;
+			pload->seq_number = data_temp_buff[i].seq_number;
+			pload->ts = data_temp_buff[i].ts;
+			pload->windowSize = data_temp_buff[i].windowSize;
+			data_temp_buff[i].type = USED;
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int windowSize)
+{
+	struct dg_payload temp;;
+	int i;
+	for(i = 0; i < windowSize; i++)
+	{
+		if(data_temp_buff[i].type == USED)
+		{
+			data_temp_buff[i] = pload;
+			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
+			return 1;
+		}
+	}
+	return 0;
+}
+
+int is_new_packet_present(struct dg_payload* data_temp_buff, int windowSize)
+{
+	int i;
+	for(i = 0; i < windowSize; i++)
+	{
+		if(data_temp_buff[i].type != USED)
+		{
+			return 1;
+		}
+	}
+	return 0;
+}
+
+void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize)
+{
+	int i;
+	for(i = 0; i < windowSize; i++)
+	{
+		data_temp_buff[i].type = USED;
+	}
+}
+
+int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize)
+{
+	int count = 0;
+	int i;
+	for(i = 0; i < windowSize; i++)
+	{
+		if(data_temp_buff[i].type != USED)
+			count++;
+	}
+	return count;
+}
+
+int getWindowSize(uint32_t windowSize, int databuff_index, int temp_buff_size)
+{
+	int size = windowSize - databuff_index%40 - temp_buff_size;
+	printf("Sending Window size : %d\n", (size < 0 ? 0 : size));
+	return size < 0 ? 0 : size;
 }
 
