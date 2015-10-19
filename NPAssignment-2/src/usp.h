@@ -171,6 +171,8 @@ bool populateDataList(struct Node *sent,int fd,
 struct Node * BuildCircularLinkedList(int size);
 void printList(struct Node *head);
 
+void setRandomSeed(int seed);
+
 unsigned int rand_interval(unsigned int, unsigned int);
 
 unsigned int is_in_limits(float);
