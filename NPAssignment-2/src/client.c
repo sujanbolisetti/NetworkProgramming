@@ -237,8 +237,9 @@ int main(int argc,char **argv){
 		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 
 		// drop packet if packet received is less than expected
-		if(server_seq_num != -1 && server_seq_num > pload.seq_number)
+		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
 		{
+			printf("Discarding seqNum :%d  pload seq %d\n",server_seq_num,recv_pload.seq_number);
 			continue;
 		}
 
@@ -350,8 +351,8 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, 
 	send_pload.ack = seq;
 	send_pload.windowSize = windowSize;
 	send_pload.type = type;
+	server_seq_num = send_pload.ack-1;
 	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
-	server_seq_num = send_pload.seq_number;
 	printf("Sent ack with seq num : %d\n", send_pload.ack);
 }
 
@@ -378,8 +379,19 @@ int getPacket(struct dg_payload *pload, struct dg_payload *data_temp_buff, int s
 int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int windowSize)
 {
 	struct dg_payload temp;;
+
 	int i;
+	bool isPresent = false;
 	for(i = 0; i < windowSize; i++)
+	{
+		if(pload.seq_number == data_temp_buff[i].seq_number)
+		{
+			isPresent = true;
+			printf("Already present %d \n", data_temp_buff[i].seq_number);
+		}
+	}
+
+	for(i = 0; i < windowSize && !isPresent; i++)
 	{
 		if(data_temp_buff[i].type == USED)
 		{
@@ -388,6 +400,7 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 			return 1;
 		}
 	}
+
 	return 0;
 }
 

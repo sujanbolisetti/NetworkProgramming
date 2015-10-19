@@ -227,7 +227,7 @@ void printList(struct Node *head){
 }
 
 bool populateDataList(struct Node *sent,int fd,
-			int windowSize,struct Node* ackNode){
+			int windowSize,struct Node* ackNode,struct Node *headNode){
 
 	char buff[PACKET_SIZE];
 	int n;
@@ -235,7 +235,7 @@ bool populateDataList(struct Node *sent,int fd,
 
 	while(windowSize--){
 
-		if((ackNode==NULL && sent->ind == SLIDING_WINDOW-1) || (ackNode!=NULL && ackNode == sent->next)){
+		if((ackNode==headNode && sent->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
 				printf("Circular Buffer is full\n");
 				return true;
 		}

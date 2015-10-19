@@ -283,7 +283,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	 */
 	sentNode = headNode;
 	ackNode = headNode;
-	populateDataList(sentNode,fd,1,NULL);
+	populateDataList(sentNode,fd,1,ackNode,headNode);
 
 	int size,i,duplicateAckCount=0,lastAckReceived=0;
 
@@ -293,7 +293,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			size = min(window_size,cwnd);
 
 			if(ackNode != NULL && !fin_flag){
-				queueFull = populateDataList(sentNode,fd,size,ackNode);
+				queueFull = populateDataList(sentNode,fd,size,ackNode,headNode);
 			}
 
 			alarm(rtt_start(&rttinfo)/1000);
@@ -333,11 +333,13 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						if(isMetaDataTransfer){
 							printf("Meta data retransmit\n");
 							goto sendagain;
-						}else{
+						}else if(window_size > 0){
 							printf("FileData Retransfer-2\n");
 							congestion_control(TIME_OUT,&cwnd,&ssthresh,&duplicateAckCount,&state);
 							isRetransmit=true;
 							goto senddatagain;
+						}else{
+							goto receive;
 						}
 					}
 
@@ -370,7 +372,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				sigprocmask(SIG_UNBLOCK,&sigset_alrm,NULL);
 				Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
 				sigprocmask(SIG_BLOCK,&sigset_alrm,NULL);
-				printf("received the ack with %d\n",pload.ack);
+				printf("received the ack with %d %d\n",pload.ack,pload.windowSize);
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
 
 				if(!lastAckReceived || lastAckReceived!=pload.ack){
@@ -382,8 +384,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					if(duplicateAckCount == MAX_DUPLICATE_ACK_COUNT){
 						printf("entered duplicate ack loop\n");
 						congestion_control(DUPLICATE_3_ACK,&cwnd,&ssthresh,&duplicateAckCount,&state);
-						isRetransmit=true;
-						goto senddatagain;
+						if(window_size > 0){
+							isRetransmit=true;
+							goto senddatagain;
+						}else{
+							goto receive;
+						}
 					}else{
 						congestion_control(DUPLICATE_ACK,&cwnd,&ssthresh,&duplicateAckCount,&state);
 					}
@@ -399,8 +405,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					goto done;
 				}
 
-				while(ackNode->seqNum <= pload.ack-1 && ackNode->seqNum && pload.ack-1 > 0){
-					printf("Received the ack packet with ack number :%d\n",pload.ack);
+				/**
+				 * TODO describe conditions
+				 */
+				while(ackNode->seqNum <= pload.ack-1 &&
+						ackNode->seqNum && ackNode != sentNode){
+					printf("Received the ack packet with ack number :%d\n",ackNode->seqNum);
 					ackNode->ack = ackNode->seqNum;
 					ackNode= ackNode->next;
 				}
@@ -410,6 +420,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					printf("window size :%d\n",window_size);
 					goto send;
 				}else{
+					window_size = pload.windowSize;
 					goto receive;
 				}
 	}

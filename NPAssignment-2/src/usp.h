@@ -166,7 +166,7 @@ char* getSocketAddress(struct sockaddr_in IPClient);
 bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
 bool populateDataList(struct Node *sent,int fd,
-			int windowSize,struct Node *ack_node);
+			int windowSize,struct Node* ackNode,struct Node *headNode);
 
 struct Node * BuildCircularLinkedList(int size);
 void printList(struct Node *head);
