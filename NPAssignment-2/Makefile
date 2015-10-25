@@ -1,6 +1,6 @@
 CC = gcc
 
-LIBS = -lresolv -lnsl -lpthread
+LIBS = -lresolv -lnsl -lpthread  -lm
 	
 FLAGS = -g -O2
 

@@ -258,6 +258,14 @@ int main(int argc,char **argv){
 //				printf("Received FIN from server\n");
 //				sendAcknowledgement(sockfd, recv_pload.ts, recv_pload.seq_number+1,
 //						getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), FIN_ACK);
+//				pthread_mutex_lock(&the_mutex);
+//				isFilled = true;
+//				printf("Producer thread grabbed the lock\n");
+//				pushData(recv_pload, WINDOW_SIZE);
+//				printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
+//				pthread_cond_signal(&condc);
+//				pthread_mutex_unlock(&the_mutex);
+//				printf("Producer released locks\n");
 //				break;
 //			}
 //			else
@@ -267,18 +275,15 @@ int main(int argc,char **argv){
 //		}
 
 		int type = ACK;
-		//printf("Probability of dropping packet : %f\n", prob);
 		if(!is_in_limits(prob))
 		{
 			if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
 			{
-				//printf("Producer trying to acquire lock\n");
 				pthread_mutex_lock(&the_mutex);
 				isFilled = true;
 				printf("Producer thread grabbed the lock\n");
 				pushData(recv_pload, WINDOW_SIZE);
 				printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
-
 				int ts = recv_pload.ts;
 				int seq = recv_pload.seq_number + 1;
 				if(required_seq_num != -1)
@@ -290,8 +295,8 @@ int main(int argc,char **argv){
 						printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
 						if(recv_pload.type == FIN){
 							type = FIN_ACK;
-							printf("Received FIN from server\n");
-							break;
+							closeConnection(sockfd, recv_pload, prob);
+							goto cleanClose;
 						}
 						memset(&recv_pload, 0, sizeof(recv_pload));
 						seq++;
@@ -308,6 +313,14 @@ int main(int argc,char **argv){
 						required_seq_num = -1;
 					}
 				}
+
+				if(recv_pload.type == FIN)
+				{
+					type = FIN_ACK;
+					printf("Received FIN from server\n");
+					closeConnection(sockfd, recv_pload, prob);
+					goto cleanClose;
+				}
 				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
 				if(type == FIN_ACK)
 				{
@@ -321,7 +334,6 @@ int main(int argc,char **argv){
 				sendAcknowledgement(sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 			}
 
-			//printf("Producer started releasing locks\n");
 			pthread_cond_signal(&condc);
 			pthread_mutex_unlock(&the_mutex);
 			printf("Producer released locks\n");
@@ -337,18 +349,61 @@ int main(int argc,char **argv){
 	}
 
 	printf("Waiting for printer thread to exit\n");
-	pthread_join(printer, NULL);
-	printf("Done with the file transfer\n");
-	memset(&recv_pload,0,sizeof(recv_pload));
-	recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
-	printf("Server Child Closed\n");
-	close(sockfd);
+	cleanClose:
+		pthread_join(printer, NULL);
+		printf("Done with the file transfer\n");
+		close(sockfd);
+		// TODO : Freeing the circular linked list, client and server.
+		printf("Server Child Closed\n");
 }
 
 void
 sig_alrm(int signo){
 	printf("received the sig-alarm\n");
 	siglongjmp(jmpbuf,1);
+}
+
+void closeConnection(int sockfd, struct dg_payload pload, float prob)
+{
+	pthread_cond_signal(&condc);
+	pthread_mutex_unlock(&the_mutex);
+	printf("Producer released locks\n");
+
+	struct dg_payload recv_pload;
+	struct timeval timeout;
+	timeout.tv_sec = 0;
+	timeout.tv_usec = 10000;
+
+	printf("Sending the FIN_ACK to server\n");
+	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
+		                sizeof(timeout)) < 0)
+	{
+		   printf("Unable to set the socket_option :%s\n",strerror(errno));
+		   sendAcknowledgement(sockfd, pload.ts, pload.seq_number+1, 1, FIN_ACK);
+		   return;
+	}
+
+	FIN_STATE:
+		sendAcknowledgement(sockfd, pload.ts, pload.seq_number+1, 1, FIN_ACK);
+
+		memset(&recv_pload,0,sizeof(recv_pload));
+		if(recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0){
+			goto FIN_STATE;
+		}else{
+			if(!is_in_limits(prob)){
+				if(recv_pload.type == ACK){
+					printf("Received the ACK for FIN_ACK\n");
+					return;
+				}
+				else{
+					goto FIN_STATE;
+				}
+			}else{
+				printf("Retransmitting - Sending the FIN_ACK to server\n");
+				goto FIN_STATE;
+			}
+		}
+
 }
 
 void
@@ -393,6 +448,7 @@ void* printData(void *ptr)
 	uint32_t sleepTime = *(uint32_t *)ptr;
 	while(!printDataBuff())
 	{
+		sleepTime = -1 * sleepTime * log((double)(rand()/(double)RAND_MAX));
 		usleep(sleepTime*1000);
 	}
 	isPrinterExited = true;

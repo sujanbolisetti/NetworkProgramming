@@ -195,6 +195,7 @@ bool printDataBuff();
 void* printData(void *ptr);
 bool popData();
 void pushData(struct dg_payload, int);
+void closeConnection(int sockfd, struct dg_payload pload, float prob);
 
 // UDP packet types
 enum PACKET_TYPE
