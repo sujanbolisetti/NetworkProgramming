@@ -352,6 +352,7 @@ sig_alrm(int signo){
 
 void closeConnection(int sockfd, struct dg_payload pload, float prob)
 {
+
 	pthread_cond_signal(&condc);
 	pthread_mutex_unlock(&the_mutex);
 	printf("Producer released locks\n");
@@ -362,36 +363,42 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 	timeout.tv_usec = 100000;
 
 	printf("Sending the FIN_ACK to server\n");
-	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
-		                sizeof(timeout)) < 0)
-	{
-		   printf("Unable to set the socket_option :%s\n",strerror(errno));
-		   sendAcknowledgement(sockfd, pload.ts, pload.seq_number+1, 1, FIN_ACK);
-		   return;
-	}
+	fd_set monitor_fds;
+	// clearing the fd_set
+	FD_ZERO(&monitor_fds);
+
+	// registering both sockets to listen
+	FD_SET(sockfd, &monitor_fds);
 
 	FIN_STATE:
 		sendAcknowledgement(sockfd, pload.ts, pload.seq_number+1, 1, FIN_ACK);
-
-		memset(&recv_pload,0,sizeof(recv_pload));
-		if(recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0){
+		FD_SET(sockfd, &monitor_fds);
+		if(select(sockfd+1, &monitor_fds, NULL, NULL, &timeout) < 0)
+		{
 			goto FIN_STATE;
-		}else{
-			if(!is_in_limits(prob)){
-				if(recv_pload.type == ACK){
-					printf("Received the ACK for FIN_ACK\n");
-					return;
-				}
-				else{
-					goto FIN_STATE;
-				}
-			}else{
-				printf("Intentionally dropping ACK packet after FIN_ACK\n");
-				printf("Retransmitting - Sending the FIN_ACK to server\n");
-				goto FIN_STATE;
-			}
 		}
 
+		if(FD_ISSET(sockfd, &monitor_fds))
+		{
+				memset(&recv_pload,0,sizeof(recv_pload));
+				if(recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0){
+					goto FIN_STATE;
+				}else{
+					if(!is_in_limits(prob)){
+						if(recv_pload.type == ACK){
+							printf("Received the ACK for FIN_ACK\n");
+							return;
+						}
+						else{
+							goto FIN_STATE;
+						}
+					}else{
+						printf("Intentionally dropping ACK packet after FIN_ACK\n");
+						printf("Retransmitting - Sending the FIN_ACK to server\n");
+						goto FIN_STATE;
+					}
+				}
+		}
 }
 
 void
