@@ -285,6 +285,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				printf("Closing the connection with the client\n");
 				Send_Packet(conn_sockfd,seqNum++,NULL,FIN,rtt_ts(&rttinfo));
 				fileNotExists = true;
+				alarm(rtt_start(&rttinfo)/1000);
 
 				while(1){
 					memset(&pload,0,sizeof(pload));
@@ -370,7 +371,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 							goto senddatagain;
 						}else if(window_size == 0){
 							printf("Window Size equals to zero\n");
-							Send_Packet(conn_sockfd,INT_MAX,NULL,ackNode->type,rtt_ts(&rttinfo));
+							Send_Packet(conn_sockfd,INT_MAX,NULL,WINDOW_PROBE,rtt_ts(&rttinfo));
 							goto receive;
 						}
 					}
