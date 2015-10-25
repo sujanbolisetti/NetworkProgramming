@@ -13,6 +13,7 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 	memset(&send_pload,0,sizeof(send_pload));
 	send_pload.seq_number = seq;
 	send_pload.type = type;
+	int n;
 
 	switch(type){
 		case FIN:
@@ -30,8 +31,10 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 	}
 
 	send_pload.ts = ts;
-	sendto(conn_sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
-
+	if((n = sendto(conn_sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0)) < 0){
+		printf("Error in send : %s\n",strerror(errno));
+		exit(0);
+	}
 	return seq;
 }
 
