@@ -400,7 +400,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				printf("waiting for ack\n");
 				memset(&pload,0,sizeof(pload));
 				sigprocmask(SIG_UNBLOCK,&sigset_alrm,NULL);
-				Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
+				if(Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL) < 0){
+					goto done;
+				}
 				sigprocmask(SIG_BLOCK,&sigset_alrm,NULL);
 				printf("received the ack with %d %d\n",pload.ack,pload.windowSize);
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
@@ -445,9 +447,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				 * than the received acknowledgement number and also the ackNode
 				 * should not cross the sentNode.
 				 */
-				while(ackNode->seqNum <= pload.ack-1 &&
-								ackNode != sentNode){
-					printf("Received the ack packet with ack number :%d, skipping :%d\n",pload.ack,ackNode->seqNum);
+				while(pload.ack > 0 &&
+							ackNode->seqNum <= pload.ack-1 &&
+								ackNode != sentNode ){
+					printf("Received the ack packet with ack number :%u, skipping :%d\n",pload.ack,ackNode->seqNum);
 					ackNode->ack = ackNode->seqNum;
 					ackNode= ackNode->next;
 					rtt_newpack(&rttinfo);
@@ -477,6 +480,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	done:
 		alarm(0);
 		close(conn_sockfd);
+		// TODO : clean the circular linked list.s
 		exit(0);
 }
 
