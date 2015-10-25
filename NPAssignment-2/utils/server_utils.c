@@ -15,6 +15,8 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 	send_pload.type = type;
 	if(type == FIN){
 		printf("Completed File Transfer and waiting for Acks...\n");
+	}else if(type == ACK){
+		printf("Sending an ACK ....\n");
 	}else{
 		strcpy(send_pload.buff,buff);
 	}

@@ -162,7 +162,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	bool queueFull=false;
 	bool isRetransmit=false;
 	sigset_t sigset_alrm;
-	bool isWindowSizeZero = false;
+	bool isWindowSizeZero = false,fileNotExists=false,isTimeWaitState = false;
 	uint32_t persistent_timeout = 1;
 
 	if (rttinit == 0) {
@@ -238,23 +238,24 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		}
 		alarm(rtt_start(&rttinfo)/1000);
 
-		if (sigsetjmp(jmpbuf, 1) != 0) {
-			printf("received sigalrm retransmitting\n");
-			if (rtt_timeout(&rttinfo) < 0) {
-				printf("Reached Maximum retransmission attempts : No response from the server giving up\n");
-				rttinit = 0;	/* reinit in case we're called again */
-				errno = ETIMEDOUT;
-				return;
+		signalHandling:
+			if (sigsetjmp(jmpbuf, 1) != 0) {
+				printf("received sigalrm retransmitting\n");
+				if (rtt_timeout(&rttinfo) < 0) {
+					printf("Reached Maximum retransmission attempts : No response from the server giving up\n");
+					rttinit = 0;	/* reinit in case we're called again */
+					errno = ETIMEDOUT;
+					return;
+				}
+				if(isMetaDataTransfer){
+					printf("Meta data retransmit-1\n");
+					goto sendagain;
+				}else{
+					printf("FileData Retransfer-1\n");
+					isRetransmit=true;
+					goto senddatagain;
+				}
 			}
-			if(isMetaDataTransfer){
-				printf("Meta data retransmit-1\n");
-				goto sendagain;
-			}else{
-				printf("FileData Retransfer-1\n");
-				isRetransmit=true;
-				goto senddatagain;
-			}
-		}
 
 	inet_ntop(AF_INET,&serverAddr.sin_addr,IPServer,sizeof(IPServer));
 
@@ -264,17 +265,56 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
 	printf("Received Ack for port Number packet\n");
 	alarm(0);
-
 	printf("Sending File data...\n");
-	isMetaDataTransfer = false;
+
 	int k = 0;
+	isMetaDataTransfer = false;
+	/* Closing the listening socket in the child */
+	close(sock_info->sockfd);
 
 	/**
 	 *   Building the sliding window list.
 	 */
 	headNode = BuildCircularLinkedList(flow_data->slidingWindow);
 
-	int fd = open(file_name,O_RDONLY);
+	int fd;
+	if((fd = open(file_name,O_RDONLY)) < 0){
+		// TO DO : HAVE TO DO CLEANER CLOSE OF THE CONNECTION.
+		printf("Error in opening the file :%s\n",strerror(errno));
+		FIN_STATE:
+				printf("Closing the connection with the client\n");
+				Send_Packet(conn_sockfd,seqNum++,NULL,FIN,rtt_ts(&rttinfo));
+				fileNotExists = true;
+
+				while(1){
+					memset(&pload,0,sizeof(pload));
+					Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
+					/* Resetting the alarm */
+					alarm(0);
+					if(pload.type == FIN_ACK){
+						/* Sending the final ACK */
+						Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
+						isTimeWaitState = true;
+						/* Considering the Maximum MSL as 2 sec */
+						/* After 2 seconds we will conclude the ACK is delivered correctly*/
+						alarm(2);
+					}else{
+						goto FIN_STATE;
+					}
+
+					if (sigsetjmp(jmpbuf, 1) != 0) {
+							if(fileNotExists){
+								if(isTimeWaitState){
+									printf("Client has closed the connection hence the closing the server child\n");
+									goto done;
+								}
+								printf("File Not Exisits.. Performing cleaner close\n");
+								goto FIN_STATE;
+							}
+					}
+				}
+		}
+
 
 	/**
 	 *  Ackindex -> 1
@@ -307,20 +347,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 */
 			for(i=0;i<size && !fin_flag && !queueFull;i++){
 
-				/*
-				memset(&pload,0,sizeof(pload));
-				pload.seq_number = seqNum++;
-
-				if(sentNode->type == FIN){
-					printf("file transfer completed and waiting for ACKs.......\n");
-			     	pload.type = FIN;
-			     	fin_flag = 1;
-				 }else{
-					 strcpy(pload.buff,sentNode->buff);
-				  }
-				sentNode->seqNum = pload.seq_number;
-				*/
-
 				senddatagain:
 
 				 	 if (sigsetjmp(jmpbuf, 1) != 0) {
@@ -334,6 +360,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						if(isMetaDataTransfer){
 							printf("Meta data retransmit\n");
 							goto sendagain;
+						}else if(isTimeWaitState){
+							printf("Client has closed the connection hence the closing the server child\n");
+							goto done;
 						}else if(window_size > 0){
 							printf("FileData Retransfer-2\n");
 							congestion_control(TIME_OUT,&cwnd,&ssthresh,&duplicateAckCount,&state);
@@ -348,13 +377,8 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 					if(isRetransmit){
 						alarm(rtt_start(&rttinfo)/1000);
-						//memset(&pload,0,sizeof(pload));
-						//sentNode->
 						Send_Packet(conn_sockfd,ackNode->seqNum,ackNode->buff,ackNode->type,rtt_ts(&rttinfo));
-						//pload.seq_number = ackNode->seqNum;
 						printf("Ack Data in retransmit : %d %d\n",ackNode->seqNum,ackNode->ind);
-						//strcpy(pload.buff,ackNode->buff);
-						//pload.type = PAYLOAD;
 					}else{
 						sentNode->seqNum = Send_Packet(conn_sockfd,seqNum++,sentNode->buff,sentNode->type,rtt_ts(&rttinfo));
 						if(sentNode->type == FIN){
@@ -363,9 +387,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						printf("Sent a packet with seqNumber :%d\n",sentNode->seqNum);
 						sentNode = sentNode->next;
 					}
-
-					//pload.ts = rtt_ts(&rttinfo);
-					//sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
 					if(isRetransmit){
 						isRetransmit = false;
@@ -409,13 +430,13 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 
 				if(pload.type==FIN_ACK){
-					//TODO: have to send ack and wait TIME_WAIT
 					printf("Received FIN_ACK from client\n");
-//					memset(&pload,0,sizeof(pload));
-//					pload.type = ACK;
-//					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
-					goto done;
+					alarm(0);
+					isTimeWaitState=true;
+					/*setting the alarm for last ACK*/
+					alarm(2);
+					goto receive;
 				}
 
 				/**
@@ -478,6 +499,10 @@ sig_alrm(int signo){
 	siglongjmp(jmpbuf,1);
 }
 
+/**
+ *  Function to handle congestion window.
+ */
+
 void
 congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state)
 {
@@ -518,7 +543,7 @@ congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *stat
 				if(*cwnd >= *ssthresh)
 					*state = CONGESTION_AVOIDANCE;
 			}else if(*state == CONGESTION_AVOIDANCE){
-				*cwnd=*cwnd+1;
+				*cwnd=*cwnd+(1 / *cwnd);
 			}else if(*state == FAST_RECOVERY){
 				*cwnd = *ssthresh;
 				*state = CONGESTION_AVOIDANCE;

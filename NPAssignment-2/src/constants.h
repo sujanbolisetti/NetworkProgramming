@@ -10,7 +10,7 @@
 
 #define LOOPBACK_ADDRESS "127.0.0.1"
 
-#define PACKET_SIZE 512
+#define PACKET_SIZE 496
 
 // UDP packet types
 #define ACK 1

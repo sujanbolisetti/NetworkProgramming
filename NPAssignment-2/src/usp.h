@@ -83,13 +83,14 @@ struct connected_client_address{
 };
 
 struct dg_payload{
-	uint32_t type;
 	uint32_t seq_number;
 	uint32_t ack;
 	uint32_t ts;
-	uint32_t windowSize;
+	uint16_t windowSize;
+	uint16_t type;
 	char buff[PACKET_SIZE];
 };
+
 
 struct flow_metadata{
 	uint32_t slidingWindow;
