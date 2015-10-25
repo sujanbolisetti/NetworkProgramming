@@ -23,6 +23,10 @@ bool isPrinterExited = false;
 struct Node *front = NULL, *buff_head = NULL, *rear = NULL;
 int filled_circular_buffer_size = 0;
 
+// Temporary file pointers
+FILE *fp_output;
+FILE *fp_output_seq;
+
 int main(int argc,char **argv){
 
 	FILE *fp;
@@ -71,6 +75,21 @@ int main(int argc,char **argv){
 	printf("sleep time %u\n",sleepPrinterInSecs);
 
 	setRandomSeed(randomSeed);
+
+	// Temporary output file
+	fp_output=fopen("output.txt", "w");
+	if(fp_output == NULL)
+	{
+		printf("Error in opening a file\n");
+	    exit(-1);
+	}
+
+	fp_output_seq=fopen("output_seq.txt", "w");
+	if(fp_output_seq == NULL)
+	{
+		printf("Error in opening a file\n");
+		exit(-1);
+	}
 
 	struct dg_payload data_temp_buff[windowSize];
 	WINDOW_SIZE = windowSize;
@@ -406,11 +425,23 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, 
 {
 	struct dg_payload send_pload;
 	memset(&send_pload,0,sizeof(send_pload));
-	send_pload.ts=ts;
-	send_pload.ack = seq;
-	send_pload.windowSize = windowSize;
-	send_pload.type = type;
-	server_seq_num = send_pload.ack-1;
+
+	switch(type)
+	{
+		case WINDOW_PROBE:
+			send_pload.type = type;
+			send_pload.windowSize = windowSize;
+			send_pload.ts=ts;
+			break;
+		default:
+			send_pload.ts=ts;
+			send_pload.ack = seq;
+			send_pload.windowSize = windowSize;
+			send_pload.type = type;
+			server_seq_num = send_pload.ack-1;
+			break;
+	}
+
 	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
 	printf("Sent ack with seq num : %d of type %d with window size %d \n", send_pload.ack, type, send_pload.windowSize);
 }
@@ -482,9 +513,14 @@ bool popData()
 		if(front -> type == FIN)
 		{
 			return true;
+			fflush(fp_output);
+			fclose(fp_output);
+			fclose(fp_output_seq);
 		}
 
 		//printf("Data packet seq number is %d and data is %s\n", front->seqNum, front->buff);
+		fprintf(fp_output, "%s\n", front->buff);
+		fprintf(fp_output_seq, "Printing Data packet seq number is %d\n", front->seqNum);
 		printf("Printing Data packet seq number is %d\n", front->seqNum);
 		filled_circular_buffer_size--; // Window size
 		front = front -> next;
