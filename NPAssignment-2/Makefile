@@ -10,8 +10,8 @@ DEPS =  src/usp.h src/constants.h
 
 all: client server
 
-client: client.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o random.o
-	${CC} ${FLAGS} client.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o random.o -o client ${LIBS}
+client: client.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o random.o client_utils.o
+	${CC} ${FLAGS} client.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o random.o client_utils.o -o client ${LIBS}
 	
 server: server.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o server_utils.o
 	${CC} ${FLAGS} server.o wrapsock.o wrapunix.o get_ifi_info.o common_utils.o rtt_utils.o server_utils.o -o server ${LIBS}
@@ -42,6 +42,9 @@ random.o: utils/random.c
 
 server_utils.o: utils/server_utils.c ${DEPS} 
 	${CC} ${CFLAGS} -c utils/server_utils.c
+	
+client_utils.o: utils/client_utils.c ${DEPS} 
+	${CC} ${CFLAGS} -c utils/client_utils.c
 	
 clean:
 	rm client server *.o

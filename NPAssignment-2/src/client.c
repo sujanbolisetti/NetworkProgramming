@@ -14,13 +14,14 @@ static int	rttinit = 0;
 static sigjmp_buf jmpbuf;
 int server_seq_num = -1;
 
-void sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type);
-int storePacket(struct dg_payload, struct dg_payload *data_temp_buff, int windowSize);
-int getPacket(struct dg_payload*, struct dg_payload *data_temp_buff, int seq_num, int windowSize);
-int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize);
-void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize);
-int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize);
-int getWindowSize(uint32_t windowSize, int databuff_index, int temp_buff_size);
+// Thread conditions
+pthread_mutex_t the_mutex;
+pthread_cond_t condc, condp;
+bool isFilled = false;
+bool isPrinterExited = false;
+
+struct Node *front = NULL, *buff_head = NULL, *rear = NULL;
+int filled_circular_buffer_size = 0;
 
 int main(int argc,char **argv){
 
@@ -50,6 +51,13 @@ int main(int argc,char **argv){
 	float prob;
 	int randomSeed;
 	int required_seq_num = -1;
+	uint32_t sleepPrinterInSecs = 0;
+
+	// Threading related
+	pthread_t printer;
+	pthread_mutex_init(&the_mutex, NULL);
+	pthread_cond_init(&condc, NULL);		/* Initialize consumer condition variable */
+	pthread_cond_init(&condp, NULL);		/* Initialize producer condition variable */
 
 	fp=fopen("client.in","r");
 	Fscanf(fp,"%s",IPServer);
@@ -58,14 +66,25 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%d",&windowSize);
 	Fscanf(fp,"%d",&randomSeed);
 	Fscanf(fp,"%f",&prob);
+	Fscanf(fp,"%u",&sleepPrinterInSecs);
 
 	setRandomSeed(randomSeed);
 
-	char data_buff[windowSize][PACKET_SIZE];
 	struct dg_payload data_temp_buff[windowSize];
 	WINDOW_SIZE = windowSize;
 
 	initializeTempBuff(data_temp_buff, windowSize);
+	buff_head = BuildCircularLinkedList(windowSize);
+	printList(buff_head);
+	front = buff_head;
+	rear = buff_head;
+
+	if(buff_head != NULL){
+		printf("Buff was not null\n");
+	}
+
+	// Create the threads
+	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
 
 	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
@@ -121,15 +140,13 @@ int main(int argc,char **argv){
 
 	inet_ntop(AF_INET,&IPClient.sin_addr,clientIP,sizeof(clientIP));
 
-	printf("Client is running on IP-Adress :%s with Port Number :%d\n",clientIP,ntohs(IPClient.sin_port));
+	printf("Client is running on IP-Address :%s with Port Number :%d\n",clientIP,ntohs(IPClient.sin_port));
 
 	if(connect(sockfd,(SA *)&serverAddr,sizeof(serverAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-
 	struct sockaddr_in peerAddress;
-
 	int peerAddrLength = sizeof(peerAddress);
 
 	Getpeername(sockfd,(SA *)&peerAddress,&peerAddrLength);
@@ -205,64 +222,82 @@ int main(int argc,char **argv){
 	sendAcknowledgement(sockfd, ts, recv_pload.seq_number+1, WINDOW_SIZE, ACK);
 	printf("Has sent the ack :%d for the port number\n", recv_pload.seq_number+1);
 
-	int databuff_index=0;
-	bool print= false;
-
-	/**
-	 * TODO:
-	 *  Have to do separate thread to read the buffer.
-	 */
-	int temp_index=0; // Testing purpose
 	for(;;){
 
-		memset(&recv_pload,0,sizeof(recv_pload));
 		printf("Client is waiting for data packet\n");
+		memset(&recv_pload,0,sizeof(recv_pload));
 		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
-
 		printf("Client has received the data packet %d\n", recv_pload.seq_number);
-		// drop packet if packet received is less than expected
+
+		// store in other list and send ack for required packet
+		printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, windowSize)));
+		if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, windowSize)) == 0)
+		{
+			printf("Unable to store packet. Receive buffer is full\n");
+			continue;
+		}
+
+		// drop packet if packet received is less than expected seq number
 		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
 		{
+			sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 			printf("Discarding seqNum less than : %d  receive seqNum %d\n", server_seq_num + 1,recv_pload.seq_number);
 			continue;
 		}
 
-		if(recv_pload.type == FIN && required_seq_num == -1){
-			print=true;
-			sendAcknowledgement(sockfd, ts, recv_pload.seq_number+1,
-					getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), FIN_ACK);
-			goto stdout;
+		if(recv_pload.type == WINDOW_PROBE){
+			printf("Sending the acknowledgment for window probe segment \n");
+			sendAcknowledgement(sockfd, recv_pload.ts, INT_MAX,
+								getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
+			continue;
 		}
 
+//		if(recv_pload.type == FIN)
+//		{
+//			if(required_seq_num == -1 && server_seq_num + 1 == recv_pload.seq_number){
+//				printf("Received FIN from server\n");
+//				sendAcknowledgement(sockfd, recv_pload.ts, recv_pload.seq_number+1,
+//						getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), FIN_ACK);
+//				break;
+//			}
+//			else
+//			{
+//				continue;
+//			}
+//		}
+
 		int type = ACK;
-		if(!is_in_limits(prob) || required_seq_num != -1)
-		//if(!(recv_pload.seq_number == 2 && temp_index < 3))
+		//printf("Probability of dropping packet : %f\n", prob);
+		if(!is_in_limits(prob))
 		{
 			if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
 			{
-				memset(data_buff[databuff_index%40],0,PACKET_SIZE);
-				strcpy(data_buff[databuff_index%40],recv_pload.buff);
+				//printf("Producer trying to acquire lock\n");
+				pthread_mutex_lock(&the_mutex);
+				isFilled = true;
+				printf("Producer thread grabbed the lock\n");
+				pushData(recv_pload, WINDOW_SIZE);
+				printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
+
 				int ts = recv_pload.ts;
-				int seq = recv_pload.seq_number+1;
-				databuff_index++;
-				printf("Entered the loop for packet with seqNum :%d\n",recv_pload.seq_number);
+				int seq = recv_pload.seq_number + 1;
 				if(required_seq_num != -1)
 				{
 					while(getPacket(&recv_pload, data_temp_buff, seq, WINDOW_SIZE))
 					{
-						printf("Packet present in data_temp_buff %d type %d\n", recv_pload.seq_number,recv_pload.type);
-						strcpy(data_buff[databuff_index%40],recv_pload.buff);
+						printf("Packet present in data_temp_buff %d type %d\n", recv_pload.seq_number, recv_pload.type);
+						pushData(recv_pload,WINDOW_SIZE);
+						printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
 						if(recv_pload.type == FIN){
 							type = FIN_ACK;
-							print=true;
+							printf("Received FIN from server\n");
 							break;
 						}
 						memset(&recv_pload, 0, sizeof(recv_pload));
-						databuff_index++;
 						seq++;
 					}
 
-					// checking if any new packets in temp buffer
+					// checking if any new packets in temporary buffer
 					int new;
 					if((new = isNewPacketPresent(data_temp_buff, WINDOW_SIZE)))
 					{
@@ -273,53 +308,41 @@ int main(int argc,char **argv){
 						required_seq_num = -1;
 					}
 				}
-				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
+				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
+				if(type == FIN_ACK)
+				{
+					break;
+				}
 			}
 			else
 			{
-				// store in other list and send ack for required packet
-				if(getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, windowSize)) > 0)
-				{
-					storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
-					printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
-				}
-				else
-				{
-					printf("Unable to store packet. Receive buffer is full\n");
-				}
-
-				sendAcknowledgement(sockfd, ts, required_seq_num, getWindowSize(windowSize, databuff_index, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+				storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
+				printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
+				sendAcknowledgement(sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 			}
+
+			//printf("Producer started releasing locks\n");
+			pthread_cond_signal(&condc);
+			pthread_mutex_unlock(&the_mutex);
+			printf("Producer released locks\n");
 		}
 		else
 		{
-			temp_index++;
 			printf("Intentionally dropping packet %d\n", recv_pload.seq_number);
 			if(required_seq_num == -1)
 			{
 				required_seq_num = recv_pload.seq_number;
 			}
 		}
-
-		stdout:
-			if(databuff_index%40 == 0 || print){
-
-				int j;
-				for(j=0;j<databuff_index;j++){
-					//printf("data reading : %s\n",data_buff[j]);
-				}
-				if(print){
-					printf("Done with the file transfer\n");
-					memset(&recv_pload,0,sizeof(recv_pload));
-					recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
-					printf("Server Child Closed\n");
-					close(sockfd);
-					break;
-				}
-				databuff_index=0;
-			}
 	}
 
+	printf("Waiting for printer thread to exit\n");
+	pthread_join(printer, NULL);
+	printf("Done with the file transfer\n");
+	memset(&recv_pload,0,sizeof(recv_pload));
+	recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
+	printf("Server Child Closed\n");
+	close(sockfd);
 }
 
 void
@@ -339,94 +362,159 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, 
 	send_pload.type = type;
 	server_seq_num = send_pload.ack-1;
 	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
-	printf("Sent ack with seq num : %d with window size %d \n", send_pload.ack, send_pload.windowSize);
+	printf("Sent ack with seq num : %d of type %d with window size %d \n", send_pload.ack, type, send_pload.windowSize);
 }
+//
+//int getPacket(struct dg_payload *pload, struct dg_payload *data_temp_buff, int seq_num, int windowSize)
+//{
+//	int i;
+//	for(i = 0; i < windowSize; i++)
+//	{
+//		if(data_temp_buff[i].seq_number == seq_num)
+//		{
+//			pload->ack = data_temp_buff[i].ack;
+//			strcpy(pload->buff, data_temp_buff[i].buff);
+//			pload->type = data_temp_buff[i].type;
+//			pload->seq_number = data_temp_buff[i].seq_number;
+//			pload->ts = data_temp_buff[i].ts;
+//			pload->windowSize = data_temp_buff[i].windowSize;
+//			data_temp_buff[i].type = USED;
+//			return 1;
+//		}
+//	}
+//	return 0;
+//}
+//
+//int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int windowSize)
+//{
+//	int i;
+//	bool isPresent = false;
+//	for(i = 0; i < windowSize; i++)
+//	{
+//		if(pload.seq_number == data_temp_buff[i].seq_number)
+//		{
+//			isPresent = true;
+//			printf("Already present in buffer %d \n", data_temp_buff[i].seq_number);
+//			break;
+//		}
+//	}
+//
+//	for(i = 0; i < windowSize && !isPresent; i++)
+//	{
+//		if(data_temp_buff[i].type == USED)
+//		{
+//			data_temp_buff[i] = pload;
+//			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
+//			return 1;
+//		}
+//	}
+//
+//	return 0;
+//}
+//
+//int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize)
+//{
+//	int i;
+//	for(i = 0; i < windowSize; i++)
+//	{
+//		if(data_temp_buff[i].type != USED)
+//		{
+//			return 1;
+//		}
+//	}
+//	return 0;
+//}
+//
+//void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize)
+//{
+//	int i;
+//	for(i = 0; i < windowSize; i++)
+//	{
+//		data_temp_buff[i].type = USED;
+//	}
+//}
+//
+//int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize)
+//{
+//	int count = 0;
+//	int i;
+//	for(i = 0; i < windowSize; i++)
+//	{
+//		if(data_temp_buff[i].type != USED)
+//		{
+//			count++;
+//		}
+//	}
+//	return count;
+//}
 
-int getPacket(struct dg_payload *pload, struct dg_payload *data_temp_buff, int seq_num, int windowSize)
+int getWindowSize(uint32_t windowSize, int temp_buff_size)
 {
-	int i;
-	for(i = 0; i < windowSize; i++)
-	{
-		if(data_temp_buff[i].seq_number == seq_num)
-		{
-			pload->ack = data_temp_buff[i].ack;
-			strcpy(pload->buff, data_temp_buff[i].buff);
-			pload->type = data_temp_buff[i].type;
-			pload->seq_number = data_temp_buff[i].seq_number;
-			pload->ts = data_temp_buff[i].ts;
-			pload->windowSize = data_temp_buff[i].windowSize;
-			data_temp_buff[i].type = USED;
-			return 1;
-		}
-	}
-	return 0;
-}
-
-int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int windowSize)
-{
-	int i;
-	bool isPresent = false;
-	for(i = 0; i < windowSize; i++)
-	{
-		if(pload.seq_number == data_temp_buff[i].seq_number)
-		{
-			isPresent = true;
-			printf("Already present in buffer %d \n", data_temp_buff[i].seq_number);
-			break;
-		}
-	}
-
-	for(i = 0; i < windowSize && !isPresent; i++)
-	{
-		if(data_temp_buff[i].type == USED)
-		{
-			data_temp_buff[i] = pload;
-			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
-			return 1;
-		}
-	}
-
-	return 0;
-}
-
-int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize)
-{
-	int i;
-	for(i = 0; i < windowSize; i++)
-	{
-		if(data_temp_buff[i].type != USED)
-		{
-			return 1;
-		}
-	}
-	return 0;
-}
-
-void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize)
-{
-	int i;
-	for(i = 0; i < windowSize; i++)
-	{
-		data_temp_buff[i].type = USED;
-	}
-}
-
-int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize)
-{
-	int count = 0;
-	int i;
-	for(i = 0; i < windowSize; i++)
-	{
-		if(data_temp_buff[i].type != USED)
-		{
-			count++;
-		}
-	}
-	return count;
-}
-
-int getWindowSize(uint32_t windowSize, int databuff_index, int temp_buff_size)
-{
-	int size = windowSize - databuff_index%40 - temp_buff_size;
+	int size = windowSize - filled_circular_buffer_size - temp_buff_size-1;
 	return size < 0 ? 0 : size;
+}
+
+bool printDataBuff()
+{
+	bool isFinReceived = false;
+	pthread_mutex_lock(&the_mutex);
+	while (!isFilled)
+	{
+		pthread_cond_wait(&condc, &the_mutex);
+	}
+	printf("Entered printer thread with bool %d\n", isFilled);
+	printf("Printer thread acquired thread server_seq_num %d \n", server_seq_num);
+	isFinReceived = popData();
+	isFilled = false;
+	pthread_cond_signal(&condp);
+	pthread_mutex_unlock(&the_mutex);
+	return isFinReceived;
+}
+
+void* printData(void *ptr)
+{
+	uint32_t sleepTime = *(uint32_t *)ptr;
+	while(!printDataBuff())
+	{
+		usleep(sleepTime*1000);
+	}
+	isPrinterExited = true;
+	printf("Printer thread exited\n");
+	return NULL;
+}
+
+void pushData(struct dg_payload pload, int windowSize)
+{
+	if((front == buff_head && rear->ind == windowSize - 1) || front == rear->next)
+	{
+		return;
+	}
+
+	memset(rear->buff, 0, PACKET_SIZE);
+	strcpy(rear->buff, pload.buff);
+	rear->seqNum = pload.seq_number;
+	rear->type = pload.type;
+	rear = rear->next;
+	filled_circular_buffer_size++;
+}
+
+bool popData()
+{
+	if(front == rear)
+	{
+		return false;
+	}
+
+	while(front != rear)
+	{
+		//printf("Data packet seq number is %d and data is %s\n", front->seqNum, front->buff);
+		printf("Printing Data packet seq number is %d\n", front->seqNum);
+		front = front -> next;
+		filled_circular_buffer_size--; // Window size
+		if(front -> type == FIN)
+		{
+			return true;
+		}
+	}
+	return false;
 }

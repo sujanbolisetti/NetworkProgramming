@@ -134,7 +134,7 @@ void Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, str
 			if(errno == EINTR){
 				goto again;
 			}else{
-				printf("Error in recvfrom :%s",strerror(errno));
+				printf("Error in recvfrom :%s\n", strerror(errno));
 			}
 		}
 	//printf("%d\n", pload->seq_number);

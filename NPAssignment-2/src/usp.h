@@ -176,13 +176,25 @@ void setRandomSeed(int seed);
 
 unsigned int rand_interval(unsigned int, unsigned int);
 
-unsigned int is_in_limits(float);
+bool is_in_limits(float);
 
 void
 congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state);
 
 int
 Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts);
+
+void sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type);
+int storePacket(struct dg_payload, struct dg_payload *data_temp_buff, int windowSize);
+int getPacket(struct dg_payload*, struct dg_payload *data_temp_buff, int seq_num, int windowSize);
+int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize);
+void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize);
+int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize);
+int getWindowSize(uint32_t windowSize, int temp_buff_size);
+bool printDataBuff();
+void* printData(void *ptr);
+bool popData();
+void pushData(struct dg_payload, int);
 
 // UDP packet types
 enum PACKET_TYPE
