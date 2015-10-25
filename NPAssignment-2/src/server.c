@@ -144,7 +144,6 @@ int main(int argc, char **argv){
 void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClient,
 		struct flow_metadata *flow_data, char *file_name){
 
-	char buff[MAXLINE];
 	int seqNum =0;
 	bool isLocal=false;
 	int conn_sockfd = Socket(AF_INET,SOCK_DGRAM,0);
@@ -152,7 +151,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
 	struct sockaddr_in networkMaskAddr;
-	int optval=1;
+	int optval=1,state=SLOW_START,fin_flag = 0;
 	int portNumberRetransmit=0;
 	unsigned long matchNumber=0;
 	struct dg_payload pload;
@@ -160,11 +159,11 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	uint32_t q_sent = 0,q_acked = 0,q_rear = 0,window_size,cwnd,ssthresh;
 	struct Node *headNode=NULL,*sentNode=NULL,*ackNode = NULL;;
 	FILE *fp;
-	int fin_flag = 0;
 	bool queueFull=false;
 	bool isRetransmit=false;
 	sigset_t sigset_alrm;
-	int state=SLOW_START;
+	bool isWindowSizeZero = false;
+	uint32_t persistent_timeout = 1;
 
 	if (rttinit == 0) {
 		rtt_init(&rttinfo);		/* first time we're called */
@@ -308,6 +307,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 */
 			for(i=0;i<size && !fin_flag && !queueFull;i++){
 
+				/*
 				memset(&pload,0,sizeof(pload));
 				pload.seq_number = seqNum++;
 
@@ -319,6 +319,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					 strcpy(pload.buff,sentNode->buff);
 				  }
 				sentNode->seqNum = pload.seq_number;
+				*/
 
 				senddatagain:
 
@@ -338,32 +339,39 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 							congestion_control(TIME_OUT,&cwnd,&ssthresh,&duplicateAckCount,&state);
 							isRetransmit=true;
 							goto senddatagain;
-						}else{
+						}else if(window_size == 0){
+							printf("Window Size equals to zero\n");
+							Send_Packet(conn_sockfd,INT_MAX,NULL,ackNode->type,rtt_ts(&rttinfo));
 							goto receive;
 						}
 					}
 
 					if(isRetransmit){
 						alarm(rtt_start(&rttinfo)/1000);
-						memset(&pload,0,sizeof(pload));
-						pload.seq_number = ackNode->seqNum;
+						//memset(&pload,0,sizeof(pload));
+						//sentNode->
+						Send_Packet(conn_sockfd,ackNode->seqNum,ackNode->buff,ackNode->type,rtt_ts(&rttinfo));
+						//pload.seq_number = ackNode->seqNum;
 						printf("Ack Data in retransmit : %d %d\n",ackNode->seqNum,ackNode->ind);
-						strcpy(pload.buff,ackNode->buff);
-						pload.type = PAYLOAD;
+						//strcpy(pload.buff,ackNode->buff);
+						//pload.type = PAYLOAD;
+					}else{
+						sentNode->seqNum = Send_Packet(conn_sockfd,seqNum++,sentNode->buff,sentNode->type,rtt_ts(&rttinfo));
+						if(sentNode->type == FIN){
+							fin_flag = 1;
+						}
+						printf("Sent a packet with seqNumber :%d\n",sentNode->seqNum);
+						sentNode = sentNode->next;
 					}
 
-
-					pload.ts = rtt_ts(&rttinfo);
-					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
-
-					printf("Sent a packet with seqNumber :%d\n",pload.seq_number);
+					//pload.ts = rtt_ts(&rttinfo);
+					//sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 
 					if(isRetransmit){
 						isRetransmit = false;
 						break;
 					}
 
-					sentNode = sentNode->next;
 				}
 
 			receive:
@@ -375,7 +383,11 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				printf("received the ack with %d %d\n",pload.ack,pload.windowSize);
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
 
-				if(!lastAckReceived || lastAckReceived!=pload.ack){
+				if(pload.type == WINDOW_PROBE){
+					goto window_size_update;
+				}
+
+				if(!lastAckReceived || (lastAckReceived!=pload.ack)){
 					congestion_control(NEW_ACK,&cwnd,&ssthresh,&duplicateAckCount,&state);
 					printf("last received ack :%d\n",pload.ack);
 					lastAckReceived = pload.ack;
@@ -399,28 +411,44 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				if(pload.type==FIN_ACK){
 					//TODO: have to send ack and wait TIME_WAIT
 					printf("Received FIN_ACK from client\n");
-					memset(&pload,0,sizeof(pload));
-					pload.type = ACK;
-					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+//					memset(&pload,0,sizeof(pload));
+//					pload.type = ACK;
+//					sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
+					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
 					goto done;
 				}
 
 				/**
-				 * TODO describe conditions
+				 * We will move the ackNode in case the ackNode seqNumber is less
+				 * than the received acknowledgement number and also the ackNode
+				 * should not cross the sentNode.
 				 */
 				while(ackNode->seqNum <= pload.ack-1 &&
-						ackNode->seqNum && ackNode != sentNode){
-					printf("Received the ack packet with ack number :%d\n",ackNode->seqNum);
+								ackNode != sentNode){
+					printf("Received the ack packet with ack number :%d, skipping :%d\n",pload.ack,ackNode->seqNum);
 					ackNode->ack = ackNode->seqNum;
 					ackNode= ackNode->next;
+					rtt_newpack(&rttinfo);
 				}
 
+
+			window_size_update:
+				window_size = pload.windowSize;
+
 				if(pload.windowSize > 0){
-					window_size = pload.windowSize;
+					if(isWindowSizeZero){
+						reset_persistent_timeout_value(&persistent_timeout);
+						isWindowSizeZero=false;
+					}
 					printf("window size :%d\n",window_size);
 					goto send;
-				}else{
-					window_size = pload.windowSize;
+				}else if(!pload.windowSize){
+					printf("Entered window size zero\n");
+					isWindowSizeZero = true;
+					// setting the alarm for persistent_timer to do window probes.
+					printf("time-out :%d\n",persistent_timeout);
+					alarm(persistent_timeout); // In seconds.
+					increment_persistent_timeout_value(&persistent_timeout);
 					goto receive;
 				}
 	}
@@ -474,6 +502,7 @@ congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *stat
 				*ssthresh = *cwnd/2 + 1;//ceil(d/2.0);
 				*cwnd = *ssthresh + 3;
 				*state = FAST_RECOVERY;
+				*duplicateAck =0;
 			}
 			break;
 		case DUPLICATE_ACK:

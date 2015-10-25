@@ -10,7 +10,7 @@
 
 #define LOOPBACK_ADDRESS "127.0.0.1"
 
-#define MAXLINE 1024
+#define PACKET_SIZE 512
 
 // UDP packet types
 #define ACK 1
@@ -18,30 +18,25 @@
 #define FIN 4
 #define FIN_ACK 8
 #define USED 16
+#define WINDOW_PROBE 32
 
+#define SLIDING_WINDOW 40 // In segments.
 
-#define SLOWSTART 1
-#define FASTRESTRANSMIT 2
+#define MAX_DUPLICATE_ACK_COUNT 3 // In segments.
 
-#define SLIDING_WINDOW 40
-
-#define MAX_DUPLICATE_ACK_COUNT 3
-
-// States
+// Congestion Control states.
 #define SLOW_START 1
 #define CONGESTION_AVOIDANCE 2
 #define FAST_RECOVERY 4
 
-// events
+// Events.
 #define TIME_OUT 1
 #define DUPLICATE_3_ACK 2
 #define DUPLICATE_ACK 4
 #define NEW_ACK 8
 
+#define PERSISTENT_TIMER_MAX_TIMEOUT 60 // In seconds.
 
-
-
-
-
+#define PERSISTENT_TIMER_MIN_TIMEOUT 1 // In seconds.
 
 #endif /* CONSTANTS_H_ */

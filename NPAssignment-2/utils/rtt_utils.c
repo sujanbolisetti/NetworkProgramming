@@ -143,5 +143,19 @@ rtt_debug(struct rtt_info *ptr)
 	fflush(stderr);
 }
 
+void increment_persistent_timeout_value(uint32_t *ts){
+
+	// doubles on every call.
+	*ts = (*ts) * 2;
+
+	if(*ts > 4){
+		*ts = 4;
+	}
+}
+
+void reset_persistent_timeout_value(uint32_t *ts){
+	*ts = 1;
+}
+
 
 

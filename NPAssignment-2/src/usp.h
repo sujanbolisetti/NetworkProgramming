@@ -47,7 +47,9 @@
 
 #include<math.h>
 
-#include	"unprtt.h"
+#include<limits.h>
+
+#include "unprtt.h"
 
 // #include <sys/sockio.h>
 
@@ -58,8 +60,6 @@
 #include <stdbool.h>
 
 #include "constants.h"
-
-#define PACKET_SIZE 512
 
 #define SA struct sockaddr
 
@@ -179,6 +179,9 @@ unsigned int is_in_limits(float);
 
 void
 congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state);
+
+int
+Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts);
 
 // UDP packet types
 enum PACKET_TYPE

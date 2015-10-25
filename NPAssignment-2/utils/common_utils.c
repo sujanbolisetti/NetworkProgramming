@@ -235,7 +235,7 @@ bool populateDataList(struct Node *sent,int fd,
 
 	while(windowSize--){
 
-		if((ackNode==headNode && sent->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
+		if((ackNode==headNode && temp->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
 				printf("Circular Buffer is full\n");
 				return true;
 		}
@@ -261,7 +261,6 @@ bool populateDataList(struct Node *sent,int fd,
 			temp->type = PAYLOAD;
 			memset(temp->buff,0,sizeof(temp->buff));
 			strcpy(temp->buff,buff);
-			//printf("data read :%s\n",buff);
 			temp->ack = 0;
 			temp = temp->next;
 	}

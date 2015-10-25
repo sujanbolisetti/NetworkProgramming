@@ -32,6 +32,9 @@ void	 rtt_stop(struct rtt_info *, uint32_t);
 int		 rtt_timeout(struct rtt_info *);
 uint32_t rtt_ts(struct rtt_info *);
 
+void increment_persistent_timeout_value(uint32_t *ts);
+void reset_persistent_timeout_value(uint32_t *ts);
+
 extern int	rtt_d_flag;	/* can be set to nonzero for addl info */
 
 
