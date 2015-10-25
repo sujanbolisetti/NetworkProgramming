@@ -121,26 +121,22 @@ void sendAck(int socket, int seq_num, struct sockaddr *sa)
 	ack.type = ACK;
 	ack.seq_number = seq_num;
 	sendto(socket, (void *) &ack, sizeof(ack), 0, sa, sizeof(*sa));
-	printf("Ack sent to seq number:%d\n", ack.seq_number);
+	printf("Ack sent to seq number: %d\n", ack.seq_number);
 }
 
-void Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t *socklen)
+int Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, struct sockaddr *sa, socklen_t *socklen)
 {
-	//printf("Packet received seq number:");
-
 	int n;
 	again:
 		if((n=recvfrom(socket, pload, size, flags, sa, socklen)) < 0){
 			if(errno == EINTR){
 				goto again;
 			}else{
-				printf("Error in recvfrom :%s\n", strerror(errno));
+				printf("Error in recvfrom : %s\n", strerror(errno));
+				return n;
 			}
 		}
-	//printf("%d\n", pload->seq_number);
-
-	//sendAck(socket, pload->seq_number, sa);
-
+	return 0;
 }
 
 

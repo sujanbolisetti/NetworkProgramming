@@ -68,6 +68,8 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%f",&prob);
 	Fscanf(fp,"%u",&sleepPrinterInSecs);
 
+	printf("sleep time %u\n",sleepPrinterInSecs);
+
 	setRandomSeed(randomSeed);
 
 	struct dg_payload data_temp_buff[windowSize];
@@ -82,9 +84,6 @@ int main(int argc,char **argv){
 	if(buff_head != NULL){
 		printf("Buff was not null\n");
 	}
-
-	// Create the threads
-	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
 
 	printf("Connecting to Server with IP-Address %s\n",IPServer);
 
@@ -197,7 +196,13 @@ int main(int argc,char **argv){
 
 	printf("Client has sent the file Name.. Awaiting for the child port number from the server\n");
 	memset(&recv_pload,0,sizeof(recv_pload));
-	Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
+	if(Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0)
+	{
+		alarm(0);
+		close(sockfd);
+		exit(0);
+	}
+
 	alarm(0);
 
 	int serverChildPortNumber = atoi(recv_pload.buff);
@@ -222,12 +227,23 @@ int main(int argc,char **argv){
 	sendAcknowledgement(sockfd, ts, recv_pload.seq_number+1, WINDOW_SIZE, ACK);
 	printf("Has sent the ack :%d for the port number\n", recv_pload.seq_number+1);
 
+	// Create the printer thread
+	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
+	printf("Started printer thread \n");
+
 	for(;;){
 
 		printf("Client is waiting for data packet\n");
 		memset(&recv_pload,0,sizeof(recv_pload));
 		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
 		printf("Client has received the data packet %d\n", recv_pload.seq_number);
+
+		if(recv_pload.type == WINDOW_PROBE){
+			printf("Sending the acknowledgment for window probe segment \n");
+			sendAcknowledgement(sockfd, recv_pload.ts, INT_MAX,
+								getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
+			continue;
+		}
 
 		// store in other list and send ack for required packet
 		printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, windowSize)));
@@ -244,35 +260,6 @@ int main(int argc,char **argv){
 			printf("Discarding seqNum less than : %d  receive seqNum %d\n", server_seq_num + 1,recv_pload.seq_number);
 			continue;
 		}
-
-		if(recv_pload.type == WINDOW_PROBE){
-			printf("Sending the acknowledgment for window probe segment \n");
-			sendAcknowledgement(sockfd, recv_pload.ts, INT_MAX,
-								getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
-			continue;
-		}
-
-//		if(recv_pload.type == FIN)
-//		{
-//			if(required_seq_num == -1 && server_seq_num + 1 == recv_pload.seq_number){
-//				printf("Received FIN from server\n");
-//				sendAcknowledgement(sockfd, recv_pload.ts, recv_pload.seq_number+1,
-//						getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), FIN_ACK);
-//				pthread_mutex_lock(&the_mutex);
-//				isFilled = true;
-//				printf("Producer thread grabbed the lock\n");
-//				pushData(recv_pload, WINDOW_SIZE);
-//				printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
-//				pthread_cond_signal(&condc);
-//				pthread_mutex_unlock(&the_mutex);
-//				printf("Producer released locks\n");
-//				break;
-//			}
-//			else
-//			{
-//				continue;
-//			}
-//		}
 
 		int type = ACK;
 		if(!is_in_limits(prob))
@@ -348,8 +335,8 @@ int main(int argc,char **argv){
 		}
 	}
 
-	printf("Waiting for printer thread to exit\n");
 	cleanClose:
+		printf("Waiting for printer thread to exit\n");
 		pthread_join(printer, NULL);
 		printf("Done with the file transfer\n");
 		close(sockfd);
@@ -372,7 +359,7 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 	struct dg_payload recv_pload;
 	struct timeval timeout;
 	timeout.tv_sec = 0;
-	timeout.tv_usec = 10000;
+	timeout.tv_usec = 100000;
 
 	printf("Sending the FIN_ACK to server\n");
 	if (setsockopt (sockfd, SOL_SOCKET, SO_RCVTIMEO, (char *)&timeout,
@@ -399,6 +386,7 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 					goto FIN_STATE;
 				}
 			}else{
+				printf("Intentionally dropping ACK packet after FIN_ACK\n");
 				printf("Retransmitting - Sending the FIN_ACK to server\n");
 				goto FIN_STATE;
 			}
@@ -446,10 +434,14 @@ bool printDataBuff()
 void* printData(void *ptr)
 {
 	uint32_t sleepTime = *(uint32_t *)ptr;
+	uint32_t threadSleep=0;
+
+	printf("sleep time in thread %u\n",sleepTime);
 	while(!printDataBuff())
 	{
-		sleepTime = -1 * sleepTime * log((double)(rand()/(double)RAND_MAX));
-		usleep(sleepTime*1000);
+		threadSleep = (sleepTime * (-1 * (log((double)(rand()/(double)RAND_MAX)))));
+		printf("Sleep time is %u and double %lf\n", threadSleep, log((double)(rand()/(double)RAND_MAX)));
+		usleep(threadSleep*1000);
 	}
 	isPrinterExited = true;
 	printf("Printer thread exited\n");

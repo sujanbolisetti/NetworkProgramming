@@ -157,7 +157,7 @@ void printInterfaceDetails(struct binded_sock_info *head);
 int
 Ioctl(int fd, int request, void *arg);
 
-void Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
+int Recvfrom(int , struct dg_payload *, ssize_t , int , struct sockaddr *, socklen_t *);
 bool Sendto(int , struct dg_payload *, ssize_t , int ,  struct sockaddr *, socklen_t );
 
 void removeClientAddrFromList(int child_pid, struct connected_client_address **head);
