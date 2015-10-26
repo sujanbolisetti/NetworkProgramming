@@ -157,8 +157,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	struct dg_payload pload;
 	struct sigaction new_action, old_action;
 	uint32_t q_sent = 0,q_acked = 0,q_rear = 0,window_size,cwnd,ssthresh;
-	struct Node *headNode=NULL,*sentNode=NULL,*ackNode = NULL;;
-	FILE *fp;
+	struct Node *headNode=NULL,*sentNode=NULL,*ackNode = NULL;
 	bool queueFull=false;
 	bool isRetransmit=false;
 	sigset_t sigset_alrm;
@@ -323,17 +322,23 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	 */
 	sentNode = headNode;
 	ackNode = headNode;
-	populateDataList(sentNode,fd,1,ackNode,headNode);
+
+	FILE *fp = fopen(file_name,"r");
+
+	//populateDataList(sentNode,&fp,1,ackNode,headNode);
 
 	int size,i,duplicateAckCount=0,lastAckReceived=0;
+
+	setRearNode(headNode);
+
 
 	for(;;){
 
 		send:
 			size = min(window_size,cwnd);
 
-			if(ackNode != NULL && !fin_flag){
-				queueFull = populateDataList(sentNode,fd,size,ackNode,headNode);
+			if(!fin_flag){
+				populateDataList(&fp,ackNode);
 			}
 
 			alarm(rtt_start(&rttinfo)/1000);
@@ -346,7 +351,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 *  2. Received a FIN/FIN_ACK from receiver.
 			 *  3. The queue is full.
 			 */
-			for(i=0;i<size && !fin_flag && !queueFull;i++){
+			for(i=0;i<size && !fin_flag && !isWindowSizeZero;i++){
 
 				senddatagain:
 
@@ -481,6 +486,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		alarm(0);
 		close(conn_sockfd);
 		// TODO : clean the circular linked list.s
+		//deleteCircularLinkedList(headNode);
 		exit(0);
 }
 

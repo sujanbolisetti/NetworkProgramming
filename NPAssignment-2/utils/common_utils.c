@@ -8,6 +8,7 @@
 #include "../src/usp.h"
 #include "../src/unpifi.h"
 
+
 void Fscanf(FILE *fp, char *format, void *data){
 
 	if(fscanf(fp,format,data) < 0){
@@ -226,47 +227,75 @@ void printList(struct Node *head){
 	printf("\n");
 }
 
-bool populateDataList(struct Node *sent,int fd,
-			int windowSize,struct Node* ackNode,struct Node *headNode){
+/*
+void deleteCircularLinkedList(struct Node *head){
+
+	struct Node *temp = head;
+	struct Node *next;
+
+	while(temp!=NULL){
+
+		next = temp->next;
+		free(temp);
+		temp = next;
+	}
+
+}
+*/
+int count=0;
+struct Node *rearNode = NULL;
+
+void setRearNode(struct Node *head){
+	rearNode = head;
+}
+
+bool populateDataList(FILE **fp,struct Node* ackNode){
 
 	char buff[PACKET_SIZE];
 	int n;
-	struct Node *temp=sent;
 
-	while(windowSize--){
+	while(rearNode->next != ackNode){
 
-		if((ackNode==headNode && temp->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
-				printf("Circular Buffer is full\n");
-				return true;
-		}
+//		if((ackNode==headNode && temp->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
+//				printf("Circular Buffer is full\n");
+//				return true;
+//		}
 
 		again:
-			if((n=read(fd,buff,sizeof(buff)-1)) < 0){
+			count++;
+			memset(buff,0,PACKET_SIZE);
+			if((n=fread(buff,1,PACKET_SIZE-1,*fp)) < 0){
+			//if(fgets(buff,PACKET_SIZE-1,*fp) != NULL){
 				if(errno == EINTR){
+					//printf("came into EINTR\n");
 					goto again;
 				}else{
 					printf("Fread error :%s\n",strerror(errno));
 					break;
 				}
-			}else if(n==0){
+			}
+
+			if(feof(*fp)){
 				printf("EOF reached\n");
-				temp->type = FIN;
-				printf("Changed to FIN\n");
+				rearNode->type = FIN;
+				printf("Changed to FIN %s\n",buff);
+				printf("********** value of count :%d #######\n",count);
 				break;
 			}
 
 			printf("value of n : %d\n",n);
 
-			buff[n] = '\0';
-			temp->type = PAYLOAD;
-			memset(temp->buff,0,sizeof(temp->buff));
-			strcpy(temp->buff,buff);
-			temp->ack = 0;
-			temp = temp->next;
+			if(n!=0){
+				buff[n] = '\0';
+				rearNode->type = PAYLOAD;
+				memset(rearNode->buff,0,sizeof(rearNode->buff));
+				strcpy(rearNode->buff,buff);
+				rearNode->ack = 0;
+				rearNode = rearNode->next;
+
+			}
 	}
-
 	return false;
-
 }
 
 
