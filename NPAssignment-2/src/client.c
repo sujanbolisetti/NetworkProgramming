@@ -91,10 +91,10 @@ int main(int argc,char **argv){
 		exit(-1);
 	}
 
-	struct dg_payload data_temp_buff[windowSize];
-	WINDOW_SIZE = windowSize;
+	struct dg_payload data_temp_buff[windowSize-1];
+	WINDOW_SIZE = windowSize-1;
 
-	initializeTempBuff(data_temp_buff, windowSize);
+	initializeTempBuff(data_temp_buff, WINDOW_SIZE);
 	buff_head = BuildCircularLinkedList(windowSize);
 	printList(buff_head);
 	front = buff_head;
@@ -272,6 +272,12 @@ int main(int argc,char **argv){
 			continue;
 		}
 
+		if(server_seq_num + WINDOW_SIZE - 5 <= recv_pload.seq_number)
+		{
+			printf("Discarding %d\n", recv_pload.seq_number);
+			continue;
+		}
+
 		// drop packet if packet received is less than expected seq number
 		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
 		{
@@ -285,6 +291,7 @@ int main(int argc,char **argv){
 		{
 			if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
 			{
+				printf("producer trying to grab\n");
 				pthread_mutex_lock(&the_mutex);
 				isFilled = true;
 				printf("Producer thread grabbed the lock\n");
@@ -455,6 +462,7 @@ int getWindowSize(uint32_t windowSize, int temp_buff_size)
 bool printDataBuff()
 {
 	bool isFinReceived = false;
+	printf("consumer trying to grab\n");
 	pthread_mutex_lock(&the_mutex);
 	while (!isFilled)
 	{
@@ -478,7 +486,14 @@ void* printData(void *ptr)
 	while(!printDataBuff())
 	{
 		threadSleep = (sleepTime * (-1 * (log((double)(rand()/(double)RAND_MAX)))));
+
+		if(threadSleep < 100){
+			threadSleep = 100;
+		}else if(threadSleep > 1000){
+			threadSleep = 1000;
+		}
 		printf("Sleep time is %u and double %lf\n", threadSleep, log((double)(rand()/(double)RAND_MAX)));
+
 		usleep(threadSleep*1000);
 	}
 	isPrinterExited = true;

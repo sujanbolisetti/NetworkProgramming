@@ -351,7 +351,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 *  2. Received a FIN/FIN_ACK from receiver.
 			 *  3. The queue is full.
 			 */
-			for(i=0;i<size && !fin_flag && !isWindowSizeZero;i++){
+			for(i=0;i<size && !fin_flag && sentNode->next != ackNode;i++){
 
 				senddatagain:
 
@@ -374,7 +374,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 							congestion_control(TIME_OUT,&cwnd,&ssthresh,&duplicateAckCount,&state);
 							isRetransmit=true;
 							goto senddatagain;
-						}else if(window_size == 0){
+						}else if(isWindowSizeZero){
 							printf("Window Size equals to zero\n");
 							Send_Packet(conn_sockfd,INT_MAX,NULL,WINDOW_PROBE,rtt_ts(&rttinfo));
 							goto receive;
@@ -468,6 +468,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				if(pload.windowSize > 0){
 					if(isWindowSizeZero){
 						reset_persistent_timeout_value(&persistent_timeout);
+						alarm(0);
 						isWindowSizeZero=false;
 					}
 					printf("window size :%d\n",window_size);
