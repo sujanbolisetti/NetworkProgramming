@@ -154,6 +154,8 @@ int getMaxFD(struct binded_sock_info *head);
 
 void printInterfaceDetails(struct binded_sock_info *head);
 
+struct dg_payload convertToHostOrder(struct dg_payload pload);
+
 int
 Ioctl(int fd, int request, void *arg);
 
@@ -166,7 +168,7 @@ char* getSocketAddress(struct sockaddr_in IPClient);
 
 bool isClientConnected(struct connected_client_address *head,char *ipAddressSocket);
 
-bool populateDataList(FILE **fp,struct Node* ackNode);
+bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull);
 
 void setRearNode(struct Node *head);
 
@@ -186,17 +188,29 @@ int
 Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts);
 
 void sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type);
+
 int storePacket(struct dg_payload, struct dg_payload *data_temp_buff, int windowSize);
+
 int getPacket(struct dg_payload*, struct dg_payload *data_temp_buff, int seq_num, int windowSize);
+
 int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize);
+
 void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize);
+
 int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize);
+
 void printTempBuff(struct dg_payload* data_temp_buff, int windowSize);
+
 int getWindowSize(uint32_t windowSize, int temp_buff_size);
+
 bool printDataBuff();
+
 void* printData(void *ptr);
+
 bool popData();
+
 void pushData(struct dg_payload, int);
+
 void closeConnection(int sockfd, struct dg_payload pload, float prob);
 
 // UDP packet types

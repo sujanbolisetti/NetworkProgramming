@@ -230,21 +230,31 @@ void printList(struct Node *head){
 	printf("\n");
 }
 
-/*
+
+/**
+ *  Helper method to delete the circular linked list.
+ */
 void deleteCircularLinkedList(struct Node *head){
 
 	struct Node *temp = head;
 	struct Node *next;
 
-	while(temp!=NULL){
+	if(!DEBUG)
+		printf("Freeing Circular Linked List\n");
+
+	while(temp->next!=head){
 
 		next = temp->next;
 		free(temp);
 		temp = next;
 	}
 
+	free(temp);
+
 }
-*/
+
+
+
 int count=0;
 struct Node *rearNode = NULL;
 
@@ -252,23 +262,17 @@ void setRearNode(struct Node *head){
 	rearNode = head;
 }
 
-bool populateDataList(FILE **fp,struct Node* ackNode){
+bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 
 	char buff[PACKET_SIZE];
 	int n;
 
 	while(rearNode->next != ackNode){
 
-//		if((ackNode==headNode && temp->ind == SLIDING_WINDOW-1) || (ackNode == temp->next)){
-//				printf("Circular Buffer is full\n");
-//				return true;
-//		}
-
 		again:
 			count++;
 			memset(buff,0,PACKET_SIZE);
 			if((n=fread(buff,1,PACKET_SIZE-1,*fp)) < 0){
-			//if(fgets(buff,PACKET_SIZE-1,*fp) != NULL){
 				if(errno == EINTR){
 					//printf("came into EINTR\n");
 					goto again;
@@ -281,12 +285,17 @@ bool populateDataList(FILE **fp,struct Node* ackNode){
 			if(feof(*fp)){
 				printf("EOF reached\n");
 				rearNode->type = FIN;
-				printf("Changed to FIN %s\n",buff);
-				printf("********** value of count :%d #######\n",count);
-				break;
+
+				if(DEBUG){
+					printf("Changed to FIN %s\n",buff);
+					printf("********** value of count :%d #######\n",count);
+				}
+				return true;
 			}
 
-			printf("value of n : %d\n",n);
+			if(DEBUG){
+				printf("value of n : %d\n",n);
+			}
 
 			if(n!=0){
 				buff[n] = '\0';
@@ -299,6 +308,17 @@ bool populateDataList(FILE **fp,struct Node* ackNode){
 			}
 	}
 	return false;
+}
+
+struct dg_payload convertToHostOrder(struct dg_payload pload){
+
+	pload.ack =  ntohl(pload.ack);
+	pload.seq_number = ntohl(pload.seq_number);
+	pload.ts = ntohl(pload.ts);
+	pload.type = ntohs(pload.type);
+	pload.windowSize = ntohs(pload.windowSize);
+
+	return pload;
 }
 
 

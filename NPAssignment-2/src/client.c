@@ -99,8 +99,10 @@ int main(int argc,char **argv){
 		exit(-1);
 	}
 
+
 	struct dg_payload data_temp_buff[windowSize];
 	WINDOW_SIZE = windowSize;
+
 	initializeTempBuff(data_temp_buff, WINDOW_SIZE);
 
 	buff_head = BuildCircularLinkedList(windowSize);
@@ -194,9 +196,9 @@ int main(int argc,char **argv){
 
 	memset(&send_pload,0,sizeof(send_pload));
 	strcpy(send_pload.buff,fileName);
-	send_pload.type = PAYLOAD;
-	send_pload.seq_number = seqNum++;
-	send_pload.windowSize = windowSize;
+	send_pload.type = htons(PAYLOAD);
+	send_pload.seq_number = htonl(seqNum++);
+	send_pload.windowSize = htons(windowSize);
 
 	sendagain:
 		send_pload.ts = rtt_ts(&rttinfo);
@@ -245,7 +247,7 @@ int main(int argc,char **argv){
 		printf("Connection Error :%s",strerror(errno));
 	}
 
-	uint32_t ts =  recv_pload.ts;
+	uint32_t ts = recv_pload.ts;
 	sendAcknowledgement(sockfd, ts, recv_pload.seq_number + 1, WINDOW_SIZE, ACK);
 	printf("Sent the acknowledgment :%d to tell server that port number is received\n", recv_pload.seq_number + 1);
 
@@ -258,7 +260,10 @@ int main(int argc,char **argv){
 		printf("Client is waiting for data packet\n");
 		memset(&recv_pload,0,sizeof(recv_pload));
 		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
-		printf("Client has received the data packet sequence number : %d\n", recv_pload.seq_number);
+
+		recv_pload = convertToHostOrder(recv_pload);
+
+
 
 		if(recv_pload.type == WINDOW_PROBE){
 			printf("Received window probe request. Sending the current window size for window probe segment\n");
@@ -267,6 +272,7 @@ int main(int argc,char **argv){
 			continue;
 		}
 
+		printf("Client has received the data packet sequence number : %d\n", recv_pload.seq_number);
 		// store in other list and send ack for required packet
 		if(DEBUG)
 			printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)));
@@ -277,11 +283,6 @@ int main(int argc,char **argv){
 			continue;
 		}
 
-		/*if(server_seq_num + WINDOW_SIZE + 5 <= recv_pload.seq_number)
-		{
-			printf("Discarding... Will store only 25 packets than present acked seq and received is %d\n", recv_pload.seq_number);
-			continue;
-		}*/
 
 		// drop packet if packet received is less than expected seq number
 		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
@@ -365,7 +366,7 @@ int main(int argc,char **argv){
 		pthread_join(printer, NULL);
 		printf("Done with the file transfer\n");
 		close(sockfd);
-		// TODO : Freeing the circular linked list, client and server.
+		deleteCircularLinkedList(buff_head);
 		printf("Server Child Closed\n");
 }
 
@@ -407,6 +408,7 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 				if(recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0){
 					goto FIN_STATE;
 				}else{
+					recv_pload = convertToHostOrder(recv_pload);
 					if(!is_in_limits(prob)){
 						if(recv_pload.type == ACK){
 							printf("Received the ACK for FIN_ACK packet received\n");
@@ -433,21 +435,21 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 	switch(type)
 	{
 		case WINDOW_PROBE:
-			send_pload.type = type;
-			send_pload.windowSize = windowSize;
-			send_pload.ts=ts;
+			send_pload.type = htons(type);
+			send_pload.windowSize = htons(windowSize);
+			send_pload.ts=htonl(ts);
 			break;
 		default:
-			send_pload.ts=ts;
-			send_pload.ack = ack;
-			send_pload.windowSize = windowSize;
-			send_pload.type = type;
-			server_seq_num = ack - 1;
+			send_pload.ts=htonl(ts);;
+			send_pload.ack = htonl(ack);
+			send_pload.windowSize = htons(windowSize);
+			send_pload.type = htons(type);
+			server_seq_num = ntohl(send_pload.ack)-1;
 			break;
 	}
 
 	sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
-	printf("Sent acknowledgment with sequence number : %d of type %d with window size %d \n", send_pload.ack, type, send_pload.windowSize);
+	printf("Sent acknowledgment with sequence number : %d of type %d with window size %d \n", ntohl(send_pload.ack), type, ntohs(send_pload.windowSize));
 }
 
 int getWindowSize(uint32_t windowSize, int temp_buff_size)

@@ -39,9 +39,11 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 	{
 		if(data_temp_buff[i].type == USED)
 		{
-			data_temp_buff[i] = pload;
-			if(DEBUG)
-				printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
+			memset(data_temp_buff[i].buff,0,PACKET_SIZE);
+			strcpy(data_temp_buff[i].buff, pload.buff);
+			data_temp_buff[i].seq_number = pload.seq_number;
+			data_temp_buff[i].type = pload.type;
+			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
 			return 1;
 		}
 	}

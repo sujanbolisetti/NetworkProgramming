@@ -173,7 +173,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	/**
 	 * Initializing variables
 	 */
-	window_size = flow_data->slidingWindow;
+	window_size = ntohs(flow_data->slidingWindow);
 	cwnd = 1;
 	ssthresh = 40;
 
@@ -216,9 +216,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	sprintf(pload.buff,"%d",htons(serverAddr.sin_port));
 
-	pload.seq_number = seqNum++;
-	pload.type = PAYLOAD;
-	pload.ts = rtt_ts(&rttinfo);
+	pload.seq_number = htonl(seqNum++);
+	pload.type = htons(PAYLOAD);
+	pload.ts = htonl(rtt_ts(&rttinfo));
 
 	if(connect(conn_sockfd,(SA *)&IPClient,sizeof(IPClient)) < 0){
 		printf("Connection Error :%s",strerror(errno));
@@ -228,7 +228,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	 *   Backing up the port number
 	 */
 	sendagain:
-		pload.ts = rtt_ts(&rttinfo);
+		pload.ts = htonl(rtt_ts(&rttinfo));
 		sendto(sock_info->sockfd,(void *)&pload,sizeof(pload),0,(SA *)&IPClient,sizeof(IPClient));
 
 		if(rttinfo.rtt_nrexmt >=1){
@@ -274,7 +274,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	/**
 	 *   Building the sliding window list.
 	 */
-	headNode = BuildCircularLinkedList(flow_data->slidingWindow);
+	headNode = BuildCircularLinkedList(window_size);
 
 	int fd;
 	if((fd = open(file_name,O_RDONLY)) < 0){
@@ -289,6 +289,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				while(1){
 					memset(&pload,0,sizeof(pload));
 					Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
+					pload = convertToHostOrder(pload);
 					/* Resetting the alarm */
 					alarm(0);
 					if(pload.type == FIN_ACK){
@@ -331,21 +332,20 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	setRearNode(headNode);
 
+
 	bool receiveWindowFull = false;
 	bool windowEmpty = false;
 
+
+	bool isFull=false;
 
 	for(;;){
 
 		send:
 			size = min(window_size,cwnd);
-			if(sentNode -> seqNum - ackNode -> seqNum > size)
-			{
-				size = 0;
-			}
 
-			if(!fin_flag){
-				populateDataList(&fp,ackNode);
+			if(!fin_flag && !isFull){
+				isFull = populateDataList(&fp,ackNode,isFull);
 			}
 
 			alarm(rtt_start(&rttinfo)/1000);
@@ -358,6 +358,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 *  2. Received a FIN/FIN_ACK from receiver.
 			 *  3. The queue is full.
 			 */
+
 
 			if(sentNode->next == headNode && ackNode->next == headNode){
 					receiveWindowFull = false;
@@ -428,11 +429,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					goto done;
 				}
 				sigprocmask(SIG_BLOCK,&sigset_alrm,NULL);
-				printf("received the ack with ack : %d window size: %d\n",pload.ack,pload.windowSize);
+				pload = convertToHostOrder(pload);
+
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
 
 				if(pload.type == WINDOW_PROBE){
+					printf("received the ack for Window Probe :%d\n",pload.windowSize);
 					goto window_size_update;
+				}else{
+					printf("received the ack with %d %d\n",pload.ack,pload.windowSize);
 				}
 
 				if(!lastAckReceived || (lastAckReceived!=pload.ack)){
@@ -495,7 +500,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						alarm(0);
 						isWindowSizeZero=false;
 					}
-					printf("window size :%d\n",window_size);
+
+					if(DEBUG)
+						printf("window size :%d\n",window_size);
+
 					goto send;
 				}else if(!pload.windowSize){
 					printf("Entered window size zero\n");
@@ -510,8 +518,8 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	done:
 		alarm(0);
 		close(conn_sockfd);
-		// TODO : clean the circular linked list.s
-		//deleteCircularLinkedList(headNode);
+		fclose(fp);
+		deleteCircularLinkedList(headNode);
 		exit(0);
 }
 
