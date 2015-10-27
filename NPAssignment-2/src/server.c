@@ -151,7 +151,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
 	struct sockaddr_in networkMaskAddr;
-	int optval=1,state=SLOW_START,fin_flag = 0;
+	int optval=1,state=SLOW_START,fin_flag =  0;
 	int portNumberRetransmit=0;
 	unsigned long matchNumber=0;
 	struct dg_payload pload;
@@ -175,7 +175,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	 */
 	window_size = flow_data->slidingWindow;
 	cwnd = 1;
-	ssthresh = 80;
+	ssthresh = 40;
 
 	inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
 
@@ -331,11 +331,18 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	setRearNode(headNode);
 
+	bool receiveWindowFull = false;
+	bool windowEmpty = false;
+
 
 	for(;;){
 
 		send:
 			size = min(window_size,cwnd);
+			if(sentNode -> seqNum - ackNode -> seqNum > size)
+			{
+				size = 0;
+			}
 
 			if(!fin_flag){
 				populateDataList(&fp,ackNode);
@@ -351,10 +358,22 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 			 *  2. Received a FIN/FIN_ACK from receiver.
 			 *  3. The queue is full.
 			 */
-			for(i=0;i<size && !fin_flag && sentNode->next != ackNode;i++){
+
+			if(sentNode->next == headNode && ackNode->next == headNode){
+					receiveWindowFull = false;
+					windowEmpty = true;
+			}
+
+			for(i=0;i<size && !fin_flag &&
+				sentNode->next != ackNode && !receiveWindowFull;i++){
+
+				if(sentNode->next == headNode && !windowEmpty){
+					receiveWindowFull = true;
+				}else{
+					windowEmpty = false;
+				}
 
 				senddatagain:
-
 				 	 if (sigsetjmp(jmpbuf, 1) != 0) {
 						printf("received sigalrm retransmitting\n");
 						if (rtt_timeout(&rttinfo) < 0) {
@@ -390,7 +409,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						if(sentNode->type == FIN){
 							fin_flag = 1;
 						}
-						printf("Sent a packet with seqNumber :%d\n",sentNode->seqNum);
+						printf("Sent a packet with seqNumber : %d for Windowsize %d \n",sentNode->seqNum, window_size);
 						sentNode = sentNode->next;
 					}
 
@@ -409,7 +428,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					goto done;
 				}
 				sigprocmask(SIG_BLOCK,&sigset_alrm,NULL);
-				printf("received the ack with %d %d\n",pload.ack,pload.windowSize);
+				printf("received the ack with ack : %d window size: %d\n",pload.ack,pload.windowSize);
 				rtt_stop(&rttinfo, rtt_ts(&rttinfo) - pload.ts);
 
 				if(pload.type == WINDOW_PROBE){
@@ -452,13 +471,18 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				 * than the received acknowledgement number and also the ackNode
 				 * should not cross the sentNode.
 				 */
-				while(pload.ack > 0 &&
-							ackNode->seqNum <= pload.ack-1 &&
-								ackNode != sentNode ){
+				while(pload.ack > 0 && ackNode->seqNum <= pload.ack-1 && ackNode != sentNode ){
 					printf("Received the ack packet with ack number :%u, skipping :%d\n",pload.ack,ackNode->seqNum);
 					ackNode->ack = ackNode->seqNum;
 					ackNode= ackNode->next;
+					if(DEBUG){
+						printf("Ack Node now pointing to :%d\n",ackNode->seqNum);
+					}
 					rtt_newpack(&rttinfo);
+
+					if(ackNode->next == headNode){
+						receiveWindowFull=false;
+					}
 				}
 
 

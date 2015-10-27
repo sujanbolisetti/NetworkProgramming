@@ -214,11 +214,14 @@ void printList(struct Node *head){
 
 	printf("Printing circular list : ");
 	struct Node *temp = head;
+	printf("%d ", temp->ind);
+	temp = temp -> next;
+
 	if(temp == NULL){
 		return;
 	}
 	else{
-		while(temp->next != head)
+		while(temp != head)
 		{
 			printf("%d ", temp->ind);
 			temp = temp->next;

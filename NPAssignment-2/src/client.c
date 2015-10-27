@@ -99,12 +99,12 @@ int main(int argc,char **argv){
 		exit(-1);
 	}
 
-	struct dg_payload data_temp_buff[windowSize/20];
-	WINDOW_SIZE = windowSize/20;
-
+	struct dg_payload data_temp_buff[windowSize];
+	WINDOW_SIZE = windowSize;
 	initializeTempBuff(data_temp_buff, WINDOW_SIZE);
+
 	buff_head = BuildCircularLinkedList(windowSize);
-	printList(buff_head);
+	//printList(buff_head);
 	front = buff_head;
 	rear = buff_head;
 
@@ -272,15 +272,16 @@ int main(int argc,char **argv){
 			printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)));
 		if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0)
 		{
+			sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 			printf("Unable to store packet. Receive buffer is full\n");
 			continue;
 		}
 
-		if(server_seq_num + WINDOW_SIZE + 5 <= recv_pload.seq_number)
+		/*if(server_seq_num + WINDOW_SIZE + 5 <= recv_pload.seq_number)
 		{
 			printf("Discarding... Will store only 25 packets than present acked seq and received is %d\n", recv_pload.seq_number);
 			continue;
-		}
+		}*/
 
 		// drop packet if packet received is less than expected seq number
 		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
@@ -304,7 +305,7 @@ int main(int argc,char **argv){
 					printf("Producer thread grabbed the lock\n");
 				pushData(recv_pload, windowSize);
 				if(DEBUG)
-					printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
+					printf("Pushed the data for seq num %d and type %d\n",recv_pload.seq_number, recv_pload.type);
 				int ts = recv_pload.ts;
 				int seq = recv_pload.seq_number + 1;
 				if(required_seq_num != -1)
@@ -324,17 +325,7 @@ int main(int argc,char **argv){
 						memset(&recv_pload, 0, sizeof(recv_pload));
 						seq++;
 					}
-
-					// checking if any new packets in temporary buffer
-					int new;
-					if((new = isNewPacketPresent(data_temp_buff, WINDOW_SIZE)))
-					{
-						required_seq_num = seq;
-					}
-					else
-					{
-						required_seq_num = -1;
-					}
+					required_seq_num = seq;
 				}
 
 				if(recv_pload.type == FIN)
@@ -345,10 +336,6 @@ int main(int argc,char **argv){
 					goto cleanClose;
 				}
 				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
-				if(type == FIN_ACK)
-				{
-					break;
-				}
 			}
 			else
 			{
@@ -390,7 +377,6 @@ sig_alrm(int signo){
 
 void closeConnection(int sockfd, struct dg_payload pload, float prob)
 {
-
 	pthread_cond_signal(&condc);
 	pthread_mutex_unlock(&the_mutex);
 	if(DEBUG)
@@ -456,7 +442,7 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 			send_pload.ack = ack;
 			send_pload.windowSize = windowSize;
 			send_pload.type = type;
-			server_seq_num = send_pload.ack-1;
+			server_seq_num = ack - 1;
 			break;
 	}
 
@@ -466,7 +452,14 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 
 int getWindowSize(uint32_t windowSize, int temp_buff_size)
 {
-	int size = windowSize - filled_circular_buffer_size - temp_buff_size-1;
+	if(DEBUG)
+	{
+		printf("Receiver window size : %d\n", windowSize);
+		printf("Data buffer size : %d\n", filled_circular_buffer_size);
+		printf("Data temp buffer size : %d\n", temp_buff_size);
+	}
+
+	int size = windowSize - (filled_circular_buffer_size + 1) - temp_buff_size;
 	return size < 0 ? 0 : size;
 }
 
@@ -476,6 +469,8 @@ bool printDataBuff()
 	if(DEBUG)
 		printf("consumer trying to grab\n");
 	pthread_mutex_lock(&the_mutex);
+	if(DEBUG)
+		printf("consumer grabbed mutex\n");
 
 	while (!isFilled)
 	{
@@ -486,6 +481,9 @@ bool printDataBuff()
 		printf("Printer thread acquired thread server_seq_num %d \n", server_seq_num);
 
 	isFinReceived = popData();
+	if(isFinReceived){
+		printf("FIN Received\n");
+	}
 	isFilled = false;
 	pthread_cond_signal(&condp);
 	pthread_mutex_unlock(&the_mutex);
@@ -523,11 +521,20 @@ void pushData(struct dg_payload pload, int windowSize)
 		return;
 	}
 
+	if(front == NULL){
+		front = buff_head;
+	}
+
+	if(rear == NULL){
+		rear = buff_head;
+	}else{
+		rear = rear->next;
+	}
+
 	memset(rear->buff, 0, PACKET_SIZE);
 	strcpy(rear->buff, pload.buff);
 	rear->seqNum = pload.seq_number;
 	rear->type = pload.type;
-	rear = rear->next;
 	filled_circular_buffer_size++;
 }
 
@@ -535,13 +542,17 @@ bool popData()
 {
 	if(front == rear)
 	{
+		front = NULL;
+		rear=NULL;
 		return false;
 	}
 
-	while(front != rear)
+	while(front != rear || front -> type == FIN)
 	{
 		if(front -> type == FIN)
 		{
+			if(DEBUG)
+				printf("Poped the FIN in thread\n");
 			return true;
 			if(DEBUG)
 			{
@@ -564,5 +575,6 @@ bool popData()
 		filled_circular_buffer_size--; // Window size
 		front = front -> next;
 	}
+
 	return false;
 }

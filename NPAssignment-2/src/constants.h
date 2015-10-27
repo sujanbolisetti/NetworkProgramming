@@ -39,6 +39,6 @@
 
 #define PERSISTENT_TIMER_MIN_TIMEOUT 1 // In seconds.
 
-#define DEBUG 1
+#define DEBUG 0
 
 #endif /* CONSTANTS_H_ */

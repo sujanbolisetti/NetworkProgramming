@@ -191,6 +191,7 @@ int getPacket(struct dg_payload*, struct dg_payload *data_temp_buff, int seq_num
 int isNewPacketPresent(struct dg_payload* data_temp_buff, int windowSize);
 void initializeTempBuff(struct dg_payload* data_temp_buff, int windowSize);
 int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize);
+void printTempBuff(struct dg_payload* data_temp_buff, int windowSize);
 int getWindowSize(uint32_t windowSize, int temp_buff_size);
 bool printDataBuff();
 void* printData(void *ptr);

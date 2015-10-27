@@ -29,7 +29,8 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 		if(pload.seq_number == data_temp_buff[i].seq_number)
 		{
 			isPresent = true;
-			printf("Already present in buffer %d \n", data_temp_buff[i].seq_number);
+			if(DEBUG)
+				printf("Already present in buffer %d \n", data_temp_buff[i].seq_number);
 			break;
 		}
 	}
@@ -39,7 +40,8 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 		if(data_temp_buff[i].type == USED)
 		{
 			data_temp_buff[i] = pload;
-			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
+			if(DEBUG)
+				printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
 			return 1;
 		}
 	}
@@ -80,5 +82,23 @@ int getUsedTempBuffSize(struct dg_payload* data_temp_buff, int windowSize)
 			count++;
 		}
 	}
+	if(DEBUG)
+		printTempBuff(data_temp_buff, windowSize);
 	return count;
+}
+
+void printTempBuff(struct dg_payload* data_temp_buff, int windowSize)
+{
+	int count = 0;
+	int i;
+	printf("Temp buff has : ");
+	for(i = 0; i < windowSize; i++)
+	{
+		if(data_temp_buff[i].type != USED)
+		{
+			count++;
+			printf("%d ", data_temp_buff[i].seq_number);
+		}
+	}
+	printf("\n");
 }
