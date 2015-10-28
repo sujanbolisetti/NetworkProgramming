@@ -19,6 +19,7 @@
 #define FIN_ACK 8
 #define USED 16
 #define WINDOW_PROBE 32
+#define PORT_NUMBER 64
 
 #define SLIDING_WINDOW 40 // In segments.
 
