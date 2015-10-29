@@ -45,9 +45,9 @@ struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
 	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
 					if_temp!=NULL;if_temp = if_temp->ifi_next){
 
-			if((if_temp->ifi_flags & IFF_UP)
-					&& !((if_temp->ifi_flags & IFF_BROADCAST)
-					|| (if_temp->ifi_flags & IFF_MULTICAST))) {
+			if((if_temp->ifi_flags & IFF_UP)){
+					//&& !((if_temp->ifi_flags & IFF_BROADCAST)
+					//|| (if_temp->ifi_flags & IFF_MULTICAST))) {
 
 				addr = (struct sockaddr_in *) if_temp->ifi_addr;
 				addr->sin_family = AF_INET;
@@ -94,7 +94,8 @@ struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
 			}
 		}
 
-		temp->next = NULL;
+		if(temp!=NULL)
+			temp->next = NULL;
 
 		return head;
 }

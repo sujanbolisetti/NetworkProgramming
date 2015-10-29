@@ -104,7 +104,7 @@ int main(int argc, char **argv){
 			if(FD_ISSET(temp->sockfd,&rset)){
 
 				memset(&pload,0,sizeof(pload));
-				recvfrom(temp->sockfd,&pload,sizeof(pload),0,(SA *)&IPClient,&length);
+				Recvfrom(temp->sockfd,&pload,sizeof(pload),0,(SA *)&IPClient,&length);
 
 				ipAddressSocket = getSocketAddress(IPClient);
 
@@ -211,10 +211,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,&matchNumber);
 
 	if(matchNumber > 0){
-		printf("Client Host is Local\n");
+		printf("------------Client Host is Local Network as the Server. Hence setting the socket option MSG_DONTROUTE------------\n");
 		setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}else{
-		printf("Client is not local to the server\n");
+		printf("Client Host is not in the Local Network as the Server\n");
 	}
 
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
@@ -243,6 +243,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	pload.type = PAYLOAD;
 	pload.ts =  rtt_ts(&rttinfo);
 
+	/**
+	 *  Connecting the new socket to IPClient.
+	 */
 	if(connect(conn_sockfd,(SA *)&IPClient,sizeof(IPClient)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}
@@ -254,17 +257,18 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		pload.ts = rtt_ts(&rttinfo);
 		pload = convertToNetworkOrder(pload);
 
+		printf("Sending the server's new ephemeral port number to the client");
 		sendto(sock_info->sockfd,(void *)&pload,sizeof(pload),0,(SA *)&IPClient,sizeof(IPClient));
 
 		if(rttinfo.rtt_nrexmt >=1){
-			printf("Server time out sending through connection socket also\n");
+			printf("-------------Server timed out Hence sending through listening socket as well as connection socket------------\n");
 			sendto(conn_sockfd,(void *)&pload,sizeof(pload),0,NULL,0);
 		}
 		alarm(rtt_start(&rttinfo)/1000);
 
 		signalHandling:
 			if (sigsetjmp(jmpbuf, 1) != 0) {
-				printf("received sigalrm retransmitting\n");
+				printf("------------received a sigalrm----------\n");
 				if (rtt_timeout(&rttinfo) < 0) {
 					printf("Reached Maximum retransmission attempts : No response from the client so giving up\n");
 					rttinit = 0;	/* reinit in case we're called again */
@@ -272,10 +276,12 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					exit(0);
 				}
 				if(isMetaDataTransfer){
-					printf("Meta data retransmit-1\n");
+					printf("Retransmistting...\n");
 					goto sendagain;
 				}else{
-					printf("FileData Retransfer-1\n");
+					if(DEBUG)
+						printf("FileData Retransfer\n");
+
 					isRetransmit=true;
 					goto senddatagain;
 				}
@@ -283,13 +289,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	inet_ntop(AF_INET,&serverAddr.sin_addr,IPServer,sizeof(IPServer));
 
-	printf("Server Child is running on IP-Address :%s with port number :%d\n",IPServer,ntohs(serverAddr.sin_port));
+	printf("################Server Child is running on IP-Address :%s with port number :%d##############\n",IPServer,ntohs(serverAddr.sin_port));
 
 	memset(&pload,0,sizeof(pload));
+
 	Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL);
-	printf("Received Ack for port Number packet\n");
+	printf("---------------Received an Ack from the client for the port Number packet---------------\n");
 	alarm(0);
-	printf("Sending File data...\n");
+	printf("-------------Connection Established Succesfully--------\n");
+	printf("-------------Sending File data...-------------\n");
 
 	int k = 0;
 	isMetaDataTransfer = false;
@@ -303,7 +311,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	int fd;
 	if((fd = open(file_name,O_RDONLY)) < 0){
-		printf("Error in opening the file :%s\n",strerror(errno));
+		printf("***************Error in opening the file :%s\n*********************",strerror(errno));
 		FIN_STATE:
 				printf("Closing the connection with the client\n");
 				Send_Packet(conn_sockfd,seqNum++,"Error in opening the file : No Such file or directory exists",FIN,rtt_ts(&rttinfo));
@@ -632,6 +640,6 @@ congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *stat
 			break;
 	}
 
-	printf("cwnd : %d ssthresh :%d state : %d\n",*cwnd,*ssthresh,*state);
+	printf("*********########********cwnd : %d ssthresh :%d state : %d***********##############****\n",*cwnd,*ssthresh,*state);
 }
 

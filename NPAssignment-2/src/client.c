@@ -7,9 +7,12 @@
 #include "usp.h"
 #include  "unpifi.h"
 
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 #define	RTT_DEBUG 1
 
-#define MAX_RESTRANSMISSION_CLIENT 3
+#define MAX_RESTRANSMISSION_CLIENT 10
 
 static struct rtt_info rttinfo;
 static int	rttinit = 0;
@@ -84,7 +87,7 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%f",&prob);
 	Fscanf(fp,"%u",&sleepPrinterInSecs);
 
-	printf("Server IP : %s\n", IPServer);
+	printf(ANSI_COLOR_RED   "Server IP : %s\n" ANSI_COLOR_RESET, IPServer);
 	printf("Server Port : %d\n", portNumber);
 	printf("Client requesting file : %s\n", fileName);
 	printf("Client window size : %d\n", windowSize);
@@ -313,8 +316,9 @@ int main(int argc,char **argv){
 				sendAcknowledgement(new_sockfd, ts, server_seq_num + 1,
 							getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), SERVER_TIMEOUT);
 
-
-				transmission_count++;
+				if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0){
+						transmission_count++;
+				}
 				goto SELECT;
 			}
 			else{
