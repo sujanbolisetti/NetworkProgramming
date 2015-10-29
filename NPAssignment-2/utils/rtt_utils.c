@@ -15,8 +15,8 @@ int		rtt_d_flag = 0;		/* debug flag; can be set by caller */
  */
 #define	RTT_RTOCALC(ptr) ((ptr)->rtt_srtt + (4 * (ptr)->rtt_rttvar))
 
-static float
-rtt_minmax(float rto)
+static uint32_t
+rtt_minmax(uint32_t rto)
 {
 	if (rto < RTT_RXTMIN)
 		rto = RTT_RXTMIN;
@@ -35,7 +35,7 @@ rtt_init(struct rtt_info *ptr)
 
 	ptr->rtt_rtt    = 0;
 	ptr->rtt_srtt   = 0;
-	ptr->rtt_rttvar = 2000;
+	ptr->rtt_rttvar = 3000;
 	ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
 		/* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }

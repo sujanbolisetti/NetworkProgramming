@@ -212,6 +212,8 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob);
 
 struct dg_payload convertToNetworkOrder(struct dg_payload pload);
 
+char* printCongestionState(int congestion_state_id);
+
 // UDP packet types
 enum PACKET_TYPE
 {

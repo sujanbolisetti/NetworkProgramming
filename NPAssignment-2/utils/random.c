@@ -14,7 +14,8 @@ unsigned int RANDOM_MAX = 100;
 void setRandomSeed(int seed)
 {
         srand(seed);
-        printf("Seed set to seed %d\n", seed);
+        if(DEBUG)
+        	printf("Seed set to seed %d\n", seed);
 }
 
 unsigned int rand_interval(unsigned int min, unsigned int max)

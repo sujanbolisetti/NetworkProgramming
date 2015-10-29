@@ -7,9 +7,6 @@
 #include "usp.h"
 #include  "unpifi.h"
 
-#define ANSI_COLOR_RED     "\x1b[31m"
-#define ANSI_COLOR_RESET   "\x1b[0m"
-
 #define	RTT_DEBUG 0
 
 #define MAX_RESTRANSMISSION_CLIENT 10
@@ -87,13 +84,17 @@ int main(int argc,char **argv){
 	Fscanf(fp,"%f",&prob);
 	Fscanf(fp,"%u",&sleepPrinterInSecs);
 
-	printf(ANSI_COLOR_RED   "Server IP : %s\n" ANSI_COLOR_RESET, IPServer);
+
+	printf("Printing the input parameters from client.in file\n");
+	printf("--------------------------------------------------\n");
+	printf("Server IP : %s\n", IPServer);
 	printf("Server Port : %d\n", portNumber);
 	printf("Client requesting file : %s\n", fileName);
 	printf("Client window size : %d\n", windowSize);
 	printf("Random seed to discard a packet : %d\n", randomSeed);
 	printf("Probability of discarding a packet : %f\n", prob);
-	printf("Sleep time of printer thread %u\n", sleepPrinterInSecs);
+	printf("Sleep time of printer thread %u in milli seconds\n", sleepPrinterInSecs);
+	printf("--------------------------------------------------\n");
 
 	setRandomSeed(randomSeed);
 
@@ -123,12 +124,10 @@ int main(int argc,char **argv){
 
 	initializeTempBuff(data_temp_buff, WINDOW_SIZE);
 
+	/**
+	 *  Initiazing the buffer for receiver window.
+	 */
 	buff_head = BuildCircularLinkedList(windowSize);
-	//printList(buff_head);
-	//front = buff_head;
-	//rear = buff_head;
-
-	printf("Connecting to Server IP-Address %s\n",IPServer);
 
 	bzero(&serverAddr,sizeof(serverAddr));
 
@@ -158,6 +157,7 @@ int main(int argc,char **argv){
 	 *  We are printing the interface information to STDOUT.
 	 */
 	printf("Client Interfaces and their details\n");
+	printf("--------------------------------------------------\n");
 	printInterfaceDetails(head);
 
 	/**
@@ -172,9 +172,9 @@ int main(int argc,char **argv){
 			}
 			temp=temp->next;
 		}
-		printf("Server is not in local network to the client\n");
+		printf("------------Server Host is not in the Local Network as the Client-------------\n");
 	}else{
-		printf("server is in local network to the Client\n");
+		printf("------------Server Host is Local Network as the Client. Hence setting the socket option MSG_DONTROUTE------------\n");
 		setsockopt(sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}
 
@@ -199,7 +199,7 @@ int main(int argc,char **argv){
 
 	inet_ntop(AF_INET,&peerAddress.sin_addr,IPServer,sizeof(IPServer));
 
-	printf("Connecting to server running on IPAddress :%s with portNumber :%d\n",IPServer,ntohs(peerAddress.sin_port));
+	printf("Connecting to server running on IPAddress :%s on well known portNumber :%d\n",IPServer,ntohs(peerAddress.sin_port));
 
 	if (rttinit == 0) {
 		rtt_init(&rttinfo);		/* first time we're called */
@@ -273,10 +273,13 @@ int main(int argc,char **argv){
 
 	Bind(new_sockfd,(SA *)&IPClient,sizeof(IPClient));
 
+	printf("Connecting to server running on IPAddress :%s on ephemeral portNumber :%d\n",IPServer,serverChildPortNumber);
+
 	if(connect(new_sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}else{
-		printf("Socket is connected in client\n");
+		if(DEBUG)
+			printf("Socket is connected in client\n");
 	}
 
 	uint32_t ts = recv_pload.ts;
@@ -290,7 +293,8 @@ int main(int argc,char **argv){
 
 	// Create the printer thread
 	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
-	printf("Started printer thread successfully\n");
+	printf("Connection Established with the Server.............\n");
+	printf("Started printer/consumer thread successfully\n");
 
 	fd_set monitor_fds;
 
@@ -298,7 +302,7 @@ int main(int argc,char **argv){
 
 	for(;;){
 
-		printf("Client is waiting for data packet\n");
+		printf("Client is waiting for data packet....\n");
 		SELECT:
 
 			FD_SET(new_sockfd, &monitor_fds);
@@ -357,7 +361,7 @@ int main(int argc,char **argv){
 
 				if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0)
 				{
-					sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+					sendAcknowledgement(new_sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 					printf("Unable to store packet. Receive buffer is full\n");
 					continue;
 				}
@@ -365,7 +369,7 @@ int main(int argc,char **argv){
 				// drop packet if packet received is less than expected seq number
 				if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
 				{
-					sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+					sendAcknowledgement(new_sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 					printf("Waiting for data sequence number : %d so dropping received sequence number : %d\n", server_seq_num + 1, recv_pload.seq_number);
 					continue;
 				}
@@ -398,7 +402,7 @@ int main(int argc,char **argv){
 									type = FIN_ACK;
 									printf("Received FIN packet from server\n");
 									if(recv_pload.buff!=NULL)
-										printf("*****%s**********\n",recv_pload.buff);
+										printf("%s\n",recv_pload.buff);
 									closeConnection(sockfd, recv_pload, prob);
 									goto cleanClose;
 								}
@@ -413,7 +417,7 @@ int main(int argc,char **argv){
 							type = FIN_ACK;
 							printf("Received FIN packet from server\n");
 							if(recv_pload.buff!=NULL)
-								printf("*****%s**********\n",recv_pload.buff);
+								printf("%s\n",recv_pload.buff);
 							closeConnection(new_sockfd, recv_pload, prob);
 							goto cleanClose;
 						}
@@ -685,7 +689,7 @@ bool popData()
 			return true;
 		}
 
-		if(!DEBUG)
+		if(DEBUG)
 		{
 			printf("\nPrinting data packet sequence number is %d\n", front->seqNum);
 			printf("%s", front->buff);

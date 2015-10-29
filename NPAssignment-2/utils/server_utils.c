@@ -44,5 +44,15 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 	return seq;
 }
 
+char* printCongestionState(int congestion_state_id){
 
+	switch(congestion_state_id){
+	case SLOW_START:
+		return "Slow Start";
+	case CONGESTION_AVOIDANCE:
+		return "Congestion Avoidance";
+	case FAST_RECOVERY:
+		return "Fast Receovery";
+	}
+}
 

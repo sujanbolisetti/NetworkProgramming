@@ -105,3 +105,4 @@ void printTempBuff(struct dg_payload* data_temp_buff, int windowSize)
 	}
 	printf("\n");
 }
+

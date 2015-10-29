@@ -109,7 +109,7 @@ void printInterfaceDetails(struct binded_sock_info *head){
 			printf("IP Adress %s\n",temp->ip_address);
 			printf("Network Mask %s\n",temp->network_mask);
 			printf("Subet Address %s\n",temp->subnet_adress);
-			printf("----------------------------------------\n");
+			printf("--------------------------------------------------\n");
 			temp=temp->next;
 		}
 }
@@ -211,7 +211,9 @@ struct Node * BuildCircularLinkedList(int size){
 		temp->next = head;
 	}
 
-	printList(head);
+	if(DEBUG)
+		printList(head);
+
 	return head;
 }
 
@@ -299,8 +301,11 @@ bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 			}
 
 			if(feof(*fp)){
-				printf("**************EOF reached\n");
-				printf("value of n : %d\n",n);
+
+				if(DEBUG){
+					printf("**************EOF reached\n");
+					printf("value of n : %d\n",n);
+				}
 
 				rearNode->type = FIN;
 
