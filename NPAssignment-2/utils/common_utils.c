@@ -311,7 +311,7 @@ bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 				return true;
 			}
 
-			if(!DEBUG){
+			if(DEBUG){
 				printf("value of n : %d\n",n);
 			}
 	}

@@ -10,7 +10,7 @@
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
-#define	RTT_DEBUG 1
+#define	RTT_DEBUG 0
 
 #define MAX_RESTRANSMISSION_CLIENT 10
 
@@ -316,7 +316,7 @@ int main(int argc,char **argv){
 				sendAcknowledgement(new_sockfd, ts, server_seq_num + 1,
 							getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), SERVER_TIMEOUT);
 
-				if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0){
+				if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) != 0){
 						transmission_count++;
 				}
 				goto SELECT;
@@ -417,7 +417,15 @@ int main(int argc,char **argv){
 							closeConnection(new_sockfd, recv_pload, prob);
 							goto cleanClose;
 						}
+
 						sendAcknowledgement(new_sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
+
+						if(DEBUG)
+								printf("Filled value before :%d\n",isFilled);
+						pthread_cond_signal(&condc);
+						pthread_mutex_unlock(&the_mutex);
+						if(DEBUG)
+							printf("Producer released locks and Filled value :%d\n",isFilled);
 					}
 					else
 					{
@@ -427,10 +435,6 @@ int main(int argc,char **argv){
 						sendAcknowledgement(new_sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 					}
 
-					pthread_cond_signal(&condc);
-					pthread_mutex_unlock(&the_mutex);
-					if(DEBUG)
-						printf("Producer released locks\n");
 				}
 				else
 				{
@@ -526,6 +530,10 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 	bool is_port_number_packet = false;
 	bool is_server_timeout = false;
 
+	send_pload.ts=ts;
+	send_pload.ack = ack;
+	send_pload.windowSize = windowSize;
+	send_pload.type = type;
 	switch(type)
 	{
 		case WINDOW_PROBE:
@@ -536,20 +544,18 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 			break;
 		case PORT_NUMBER:
 			is_port_number_packet = true;
-			type = ACK;
+			send_pload.type = ACK;
+			break;
 		case SERVER_TIMEOUT:
 			is_server_timeout = true;
-			type = ACK;
-		default:
-			send_pload.ts=ts;
-			send_pload.ack = ack;
-			send_pload.windowSize = windowSize;
-			send_pload.type = type;
+			send_pload.type = ACK;
+			break;
+		case ACK:
+			send_pload.type = ACK;
 			server_seq_num = send_pload.ack-1;
 			break;
 	}
 
-	server_seq_num = send_pload.ack-1;
 	if(is_probe_req || is_port_number_packet || is_server_timeout || !is_in_limits(prob))
 	{
 		send_pload = convertToNetworkOrder(send_pload);
@@ -585,7 +591,7 @@ bool printDataBuff()
 		printf("consumer trying to grab\n");
 	pthread_mutex_lock(&the_mutex);
 	if(DEBUG)
-		printf("consumer grabbed mutex\n");
+		printf("consumer grabbed mutex isFilled value : %d\n",isFilled);
 
 	while (!isFilled)
 	{
@@ -660,7 +666,9 @@ void pushData(struct dg_payload pload, int windowSize)
 
 bool popData()
 {
-
+	if(DEBUG){
+		printf("***********Entered the pop data**********\n");
+	}
 	while(front != rear || front -> type == FIN){
 
 		if(front -> type == FIN)
@@ -704,6 +712,7 @@ bool popData()
 			printf("%s", front->buff);
 		}
 
+		filled_circular_buffer_size--;
 		front = NULL;
 		rear = NULL;
 		return false;

@@ -43,7 +43,8 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 			strcpy(data_temp_buff[i].buff, pload.buff);
 			data_temp_buff[i].seq_number = pload.seq_number;
 			data_temp_buff[i].type = pload.type;
-			printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
+			if(DEBUG)
+				printf("Stored buffer %d \n", data_temp_buff[i].seq_number);
 			return 1;
 		}
 	}

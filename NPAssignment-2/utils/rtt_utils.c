@@ -90,8 +90,10 @@ rtt_stop(struct rtt_info *ptr, uint32_t ms)
 
 	ptr->rtt_rtt = ms;	/* measured RTT in milli-seconds */
 
-	printf("milliseconds : %u\n",ms);
-	printf("after assignement : %d\n",ptr->rtt_rtt);
+	if(DEBUG){
+		printf("milliseconds : %u\n",ms);
+		printf("after assignement : %d\n",ptr->rtt_rtt);
+	}
 
 	/*
 	 * Update our estimators of RTT and mean deviation of RTT.
