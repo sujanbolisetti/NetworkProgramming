@@ -94,10 +94,7 @@ struct dg_payload{
 
 struct flow_metadata{
 	uint32_t slidingWindow;
-	uint32_t slidingWindowStart;
-	uint32_t slidingWindowEnd;
-	uint32_t cwnd;
-	uint32_t ssthresh;
+	uint32_t receiver_window;
 };
 
 struct Node{
@@ -212,6 +209,8 @@ bool popData();
 void pushData(struct dg_payload, int);
 
 void closeConnection(int sockfd, struct dg_payload pload, float prob);
+
+struct dg_payload convertToNetworkOrder(struct dg_payload pload);
 
 // UDP packet types
 enum PACKET_TYPE

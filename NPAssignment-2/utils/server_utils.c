@@ -11,12 +11,15 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 	struct dg_payload send_pload;
 
 	memset(&send_pload,0,sizeof(send_pload));
-	send_pload.seq_number = htonl(seq);
-	send_pload.type = htons(type);
+	send_pload.seq_number = seq;
+	send_pload.type = type;
 	int n;
 
 	switch(type){
 		case FIN:
+			if(buff != NULL){
+				strcpy(send_pload.buff,buff);
+			}
 			printf("Completed File Transfer and waiting for Acks...\n");
 			break;
 		case ACK:
@@ -30,7 +33,10 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 			break;
 	}
 
-	send_pload.ts = htonl(ts);
+	send_pload.ts = ts;
+
+	send_pload = convertToNetworkOrder(send_pload);
+
 	if((n = sendto(conn_sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0)) < 0){
 		printf("Error in send : %s\n",strerror(errno));
 		exit(0);

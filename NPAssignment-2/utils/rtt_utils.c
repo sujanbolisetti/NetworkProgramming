@@ -35,7 +35,7 @@ rtt_init(struct rtt_info *ptr)
 
 	ptr->rtt_rtt    = 0;
 	ptr->rtt_srtt   = 0;
-	ptr->rtt_rttvar = 0.75;
+	ptr->rtt_rttvar = 2000;
 	ptr->rtt_rto = rtt_minmax(RTT_RTOCALC(ptr));
 		/* first RTO at (srtt + (4 * rttvar)) = 3 seconds */
 }
@@ -86,9 +86,12 @@ rtt_start(struct rtt_info *ptr)
 void
 rtt_stop(struct rtt_info *ptr, uint32_t ms)
 {
-	int	delta;
+	double	delta;
 
 	ptr->rtt_rtt = ms;	/* measured RTT in milli-seconds */
+
+	printf("milliseconds : %u\n",ms);
+	printf("after assignement : %d\n",ptr->rtt_rtt);
 
 	/*
 	 * Update our estimators of RTT and mean deviation of RTT.

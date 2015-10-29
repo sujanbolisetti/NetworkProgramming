@@ -11,11 +11,11 @@
 #include	"usp.h"
 
 struct rtt_info {
-  int		rtt_rtt;	/* most recent measured RTT, in seconds */
-  int		rtt_srtt;	/* smoothed RTT estimator, in seconds */
-  int		rtt_rttvar;	/* smoothed mean deviation, in seconds */
-  int		rtt_rto;	/* current RTO to use, in milli-seconds */
-  int		rtt_nrexmt;	/* # times retransmitted: 0, 1, 2, ... */
+  uint32_t		rtt_rtt;	/* most recent measured RTT, in milli-seconds */
+  uint32_t		rtt_srtt;	/* smoothed RTT estimator, in milli-seconds */
+  uint32_t		rtt_rttvar;	/* smoothed mean deviation, in milli-seconds */
+  uint32_t		rtt_rto;	/* current RTO to use, in milli-seconds */
+  uint32_t		rtt_nrexmt;	/* # times retransmitted: 0, 1, 2, ... */
   uint32_t	rtt_base;	/* # sec since 1/1/1970 at start */
 };
 

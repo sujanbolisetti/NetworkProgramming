@@ -130,6 +130,7 @@ int Recvfrom(int socket, struct dg_payload *pload, ssize_t size, int flags, stru
 	again:
 		if((n=recvfrom(socket, pload, size, flags, sa, socklen)) < 0){
 			if(errno == EINTR){
+				printf("Received an EINTR in recvfrom\n");
 				goto again;
 			}else{
 				printf("Error in recvfrom : %s\n", strerror(errno));

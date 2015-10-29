@@ -13,6 +13,7 @@ void Fscanf(FILE *fp, char *format, void *data){
 
 	if(fscanf(fp,format,data) < 0){
 		printf("Error in reading the file : %s",strerror(errno));
+		exit(0);
 	}
 }
 
@@ -44,7 +45,9 @@ struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
 	for(if_head = if_temp = Get_ifi_info(AF_INET,1);
 					if_temp!=NULL;if_temp = if_temp->ifi_next){
 
-			if(if_temp->ifi_flags & IFF_UP){
+			if((if_temp->ifi_flags & IFF_UP)
+					&& !((if_temp->ifi_flags & IFF_BROADCAST)
+					|| (if_temp->ifi_flags & IFF_MULTICAST))) {
 
 				addr = (struct sockaddr_in *) if_temp->ifi_addr;
 				addr->sin_family = AF_INET;
@@ -186,7 +189,8 @@ struct Node * BuildCircularLinkedList(int size){
 
 	struct Node *new_node,*temp,*head=NULL;
 	int i;
-	printf("came into BuildCircularLinkedList with size :%d\n",size);
+	if(DEBUG)
+		printf("came into BuildCircularLinkedList with size :%d\n",size);
 
 	for(i=0;i<size;i++){
 		new_node = (struct Node *)malloc(sizeof(struct Node));
@@ -239,7 +243,7 @@ void deleteCircularLinkedList(struct Node *head){
 	struct Node *temp = head;
 	struct Node *next;
 
-	if(!DEBUG)
+	if(DEBUG)
 		printf("Freeing Circular Linked List\n");
 
 	while(temp->next!=head){
@@ -282,8 +286,21 @@ bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 				}
 			}
 
+			if(n>0){
+				buff[n] = '\0';
+				rearNode->type = PAYLOAD;
+				memset(rearNode->buff,0,sizeof(rearNode->buff));
+				strcpy(rearNode->buff,buff);
+				if(DEBUG)
+					printf("%s\n",rearNode->buff);
+				rearNode->ack = 0;
+				rearNode = rearNode->next;
+			}
+
 			if(feof(*fp)){
-				printf("EOF reached\n");
+				printf("**************EOF reached\n");
+				printf("value of n : %d\n",n);
+
 				rearNode->type = FIN;
 
 				if(DEBUG){
@@ -293,18 +310,8 @@ bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 				return true;
 			}
 
-			if(DEBUG){
+			if(!DEBUG){
 				printf("value of n : %d\n",n);
-			}
-
-			if(n!=0){
-				buff[n] = '\0';
-				rearNode->type = PAYLOAD;
-				memset(rearNode->buff,0,sizeof(rearNode->buff));
-				strcpy(rearNode->buff,buff);
-				rearNode->ack = 0;
-				rearNode = rearNode->next;
-
 			}
 	}
 	return false;
@@ -320,5 +327,17 @@ struct dg_payload convertToHostOrder(struct dg_payload pload){
 
 	return pload;
 }
+
+struct dg_payload convertToNetworkOrder(struct dg_payload pload){
+
+	pload.ack =  htonl(pload.ack);
+	pload.seq_number = htonl(pload.seq_number);
+	pload.ts = htonl(pload.ts);
+	pload.type = htons(pload.type);
+	pload.windowSize = htons(pload.windowSize);
+
+	return pload;
+}
+
 
 

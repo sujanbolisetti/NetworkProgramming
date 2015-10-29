@@ -7,7 +7,9 @@
 #include "usp.h"
 #include  "unpifi.h"
 
-#define	RTT_DEBUG
+#define	RTT_DEBUG 1
+
+#define MAX_RESTRANSMISSION_CLIENT 3
 
 static struct rtt_info rttinfo;
 static int	rttinit = 0;
@@ -27,6 +29,9 @@ float prob = 0.0f;
 // Stats
 int num_of_packets_dropped = 0;
 int num_of_acks_dropped = 0;
+
+struct timeval timeout;
+
 
 // Temporary file pointers
 FILE *fp_output;
@@ -60,6 +65,9 @@ int main(int argc,char **argv){
 	int randomSeed;
 	int required_seq_num = -1;
 	uint32_t sleepPrinterInSecs = 0;
+	timeout.tv_sec = 5;
+	timeout.tv_usec = 0;
+	int transmission_count = 0;
 
 	// Threading related
 	pthread_t printer;
@@ -119,7 +127,11 @@ int main(int argc,char **argv){
 
 	printf("Connecting to Server IP-Address %s\n",IPServer);
 
-	inet_pton(AF_INET,IPServer,&serverAddr.sin_addr);
+	bzero(&serverAddr,sizeof(serverAddr));
+
+	if(inet_pton(AF_INET,IPServer,&serverAddr.sin_addr) < 0){
+		printf("Inet_ptonN error\n");
+	}
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(portNumber);
 	IPClient.sin_family = AF_INET;
@@ -203,18 +215,25 @@ int main(int argc,char **argv){
 
 	memset(&send_pload,0,sizeof(send_pload));
 	strcpy(send_pload.buff,fileName);
-	send_pload.type = htons(PAYLOAD);
-	send_pload.seq_number = htonl(seqNum++);
-	send_pload.windowSize = htons(windowSize);
+	send_pload.type = PAYLOAD;
+	send_pload.seq_number = seqNum++;
+	send_pload.windowSize = windowSize;
+
+	send_pload = convertToNetworkOrder(send_pload);
 
 	sendagain:
 		send_pload.ts = rtt_ts(&rttinfo);
-		sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
 
-		printf("wait time :%d\n",rtt_start(&rttinfo));
+		if(!is_in_limits(prob)){
+			sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
+			printf("Client has sent the file Name to server... Waiting for the server child port number\n");
+		}else{
+			printf("Dropping the packet containing the fileName with seqNum :%d\n",send_pload.seq_number);
+			goto sendagain;
+		}
 
 		if (sigsetjmp(jmpbuf, 1) != 0) {
-			printf("Timeout occurred so retransmitting...\n");
+			printf("Timeout occurred so retransmitting the packet with FileName....\n");
 			if (rtt_timeout(&rttinfo) < 0) {
 				printf("Maximum retransmission attempts done. No response from the server so giving up\n");
 				rttinit = 0;	/* reinit in case we're called again */
@@ -224,8 +243,6 @@ int main(int argc,char **argv){
 			goto sendagain;
 		}
 
-
-	printf("Client has sent the file Name to server... Waiting for the server child port number\n");
 	memset(&recv_pload,0,sizeof(recv_pload));
 	if(Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0)
 	{
@@ -234,6 +251,8 @@ int main(int argc,char **argv){
 		exit(0);
 	}
 
+	recv_pload = convertToHostOrder(recv_pload);
+	rtt_stop(&rttinfo, rtt_ts(&rttinfo) - recv_pload.ts);
 	alarm(0);
 
 	int serverChildPortNumber = atoi(recv_pload.buff);
@@ -242,19 +261,23 @@ int main(int argc,char **argv){
 	close(sockfd);
 
 	struct sockaddr_in newServerAddr;
+
 	newServerAddr.sin_port = htons(serverChildPortNumber);
 	newServerAddr.sin_addr.s_addr = serverAddr.sin_addr.s_addr;
 	newServerAddr.sin_family = AF_INET;
 
-	sockfd = Socket(AF_INET,SOCK_DGRAM,0);
+	int new_sockfd = Socket(AF_INET,SOCK_DGRAM,0);
 
-	Bind(sockfd,(SA *)&IPClient,sizeof(IPClient));
+	Bind(new_sockfd,(SA *)&IPClient,sizeof(IPClient));
 
-	if(connect(sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
+	if(connect(new_sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
+	}else{
+		printf("Socket is connected in client\n");
 	}
 
 	uint32_t ts = recv_pload.ts;
+
 	sendAcknowledgement(sockfd, ts, recv_pload.seq_number + 1, WINDOW_SIZE, PORT_NUMBER);
 
 	if(DEBUG)
@@ -266,109 +289,157 @@ int main(int argc,char **argv){
 	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
 	printf("Started printer thread successfully\n");
 
+	fd_set monitor_fds;
+
+	FD_ZERO(&monitor_fds);
+
 	for(;;){
 
 		printf("Client is waiting for data packet\n");
-		memset(&recv_pload,0,sizeof(recv_pload));
-		Recvfrom(sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL);
+		SELECT:
 
-		recv_pload = convertToHostOrder(recv_pload);
+			FD_SET(new_sockfd, &monitor_fds);
 
-		if(recv_pload.type == WINDOW_PROBE){
-			printf("Received window probe request. Sending the current window size for window probe segment\n");
-			sendAcknowledgement(sockfd, recv_pload.ts, INT_MAX,
-					getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
-			continue;
-		}
+			timeout.tv_sec = 3;
 
-		printf("Client has received the data packet sequence number : %d\n", recv_pload.seq_number);
+			if(select(new_sockfd+1, &monitor_fds, NULL, NULL, &timeout) == 0){
 
-		// store in other list and send ack for required packet
-		if(DEBUG)
-		{
-			printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)));
-		}
+				if(transmission_count == MAX_RESTRANSMISSION_CLIENT){
 
-		if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0)
-		{
-			sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
-			printf("Unable to store packet. Receive buffer is full\n");
-			continue;
-		}
+					printf("Server is not responding.... Quitting the client\n");
+					exit(0);
+				}
 
-		// drop packet if packet received is less than expected seq number
-		if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
-		{
-			sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
-			printf("Waiting for data sequence number : %d so dropping received sequence number : %d\n", server_seq_num + 1, recv_pload.seq_number);
-			continue;
-		}
+				sendAcknowledgement(new_sockfd, ts, server_seq_num + 1,
+							getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), SERVER_TIMEOUT);
 
-		int type = ACK;
-		if(!is_in_limits(prob))
-		{
-			if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
+
+				transmission_count++;
+				goto SELECT;
+			}
+			else{
+
+			if(FD_ISSET(new_sockfd, &monitor_fds))
 			{
+				memset(&recv_pload,0,sizeof(recv_pload));
+				if(Recvfrom(new_sockfd,&recv_pload,sizeof(recv_pload),0,NULL,NULL) < 0){
+					if(errno == ECONNREFUSED){
+						printf("Quitting the client\n");
+					}
+					exit(0);
+				}
+
+				transmission_count=0;
+				recv_pload = convertToHostOrder(recv_pload);
+
+				uint32_t ts = recv_pload.ts;
+				uint32_t seq = recv_pload.seq_number + 1;
+
+				if(recv_pload.type == WINDOW_PROBE){
+					printf("Received window probe request. Sending the current window size for window probe segment\n");
+					sendAcknowledgement(new_sockfd, ts, INT_MAX,
+							getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
+					continue;
+				}
+
+
+				printf("Client has received the data packet sequence number : %d\n", recv_pload.seq_number);
+
+				// store in other list and send ack for required packet
 				if(DEBUG)
-					printf("producer trying to grab\n");
-				pthread_mutex_lock(&the_mutex);
-				isFilled = true;
-				if(DEBUG)
-					printf("Producer thread grabbed the lock\n");
-				pushData(recv_pload, windowSize);
-				if(DEBUG)
-					printf("Pushed the data for seq num %d and type %d\n",recv_pload.seq_number, recv_pload.type);
-				int ts = recv_pload.ts;
-				int seq = recv_pload.seq_number + 1;
-				if(required_seq_num != -1)
 				{
-					while(getPacket(&recv_pload, data_temp_buff, seq, WINDOW_SIZE))
+					printf("Window size: %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)));
+				}
+
+				if(getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)) == 0)
+				{
+					sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+					printf("Unable to store packet. Receive buffer is full\n");
+					continue;
+				}
+
+				// drop packet if packet received is less than expected seq number
+				if(server_seq_num != -1 && server_seq_num >= recv_pload.seq_number)
+				{
+					sendAcknowledgement(sockfd, ts, server_seq_num + 1, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+					printf("Waiting for data sequence number : %d so dropping received sequence number : %d\n", server_seq_num + 1, recv_pload.seq_number);
+					continue;
+				}
+
+				int type = ACK;
+				if(!is_in_limits(prob))
+				{
+					if(required_seq_num == recv_pload.seq_number || required_seq_num == -1)
 					{
 						if(DEBUG)
-							printf("Packet present in temporary buffer : %d type : %d\n", recv_pload.seq_number, recv_pload.type);
+							printf("producer trying to grab\n");
+						pthread_mutex_lock(&the_mutex);
+						isFilled = true;
+						if(DEBUG)
+							printf("Producer thread grabbed the lock\n");
+
 						pushData(recv_pload, windowSize);
 						if(DEBUG)
-							printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
-						if(recv_pload.type == FIN){
+							printf("Pushed the data for seq num %d and type %d\n",recv_pload.seq_number, recv_pload.type);
+						if(required_seq_num != -1)
+						{
+							while(getPacket(&recv_pload, data_temp_buff, seq, WINDOW_SIZE))
+							{
+								if(DEBUG)
+									printf("Packet present in temporary buffer : %d type : %d\n", recv_pload.seq_number, recv_pload.type);
+								pushData(recv_pload,windowSize);
+								if(DEBUG)
+									printf("Pushed the data for seq num %d\n",recv_pload.seq_number);
+								if(recv_pload.type == FIN){
+									type = FIN_ACK;
+									printf("Received FIN packet from server\n");
+									if(recv_pload.buff!=NULL)
+										printf("*****%s**********\n",recv_pload.buff);
+									closeConnection(sockfd, recv_pload, prob);
+									goto cleanClose;
+								}
+								memset(&recv_pload, 0, sizeof(recv_pload));
+								seq++;
+							}
+							required_seq_num = seq;
+						}
+
+						if(recv_pload.type == FIN)
+						{
 							type = FIN_ACK;
-							closeConnection(sockfd, recv_pload, prob);
+							printf("Received FIN packet from server\n");
+							if(recv_pload.buff!=NULL)
+								printf("*****%s**********\n",recv_pload.buff);
+							closeConnection(new_sockfd, recv_pload, prob);
 							goto cleanClose;
 						}
-						memset(&recv_pload, 0, sizeof(recv_pload));
-						seq++;
+						sendAcknowledgement(new_sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
 					}
-					required_seq_num = seq;
-				}
+					else
+					{
+						storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
+						if(DEBUG)
+							printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
+						sendAcknowledgement(new_sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
+					}
 
-				if(recv_pload.type == FIN)
+					pthread_cond_signal(&condc);
+					pthread_mutex_unlock(&the_mutex);
+					if(DEBUG)
+						printf("Producer released locks\n");
+				}
+				else
 				{
-					type = FIN_ACK;
-					printf("Received FIN packet from server\n");
-					closeConnection(sockfd, recv_pload, prob);
-					goto cleanClose;
+					printf("Intentionally dropping packet with sequence number : %d\n", recv_pload.seq_number);
+					num_of_packets_dropped++;
+					if(required_seq_num == -1)
+					{
+						required_seq_num = recv_pload.seq_number;
+					}
 				}
-				sendAcknowledgement(sockfd, ts, seq, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), type);
 			}
-			else
-			{
-				storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
-				if(DEBUG)
-					printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
-				sendAcknowledgement(sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
-			}
-
-			pthread_cond_signal(&condc);
-			pthread_mutex_unlock(&the_mutex);
-			if(DEBUG)
-				printf("Producer released locks\n");
-		}
-		else
-		{
-			printf("Intentionally dropping data packet with sequence number : %d\n", recv_pload.seq_number);
-			num_of_packets_dropped++;
-			if(required_seq_num == -1)
-			{
-				required_seq_num = recv_pload.seq_number;
+			else{
+				goto SELECT;
 			}
 		}
 	}
@@ -377,7 +448,7 @@ int main(int argc,char **argv){
 		printf("Waiting for printer thread to exit\n");
 		pthread_join(printer, NULL);
 		printf("Done with the file transfer\n");
-		close(sockfd);
+		close(new_sockfd);
 		deleteCircularLinkedList(buff_head);
 		printf("Client closed successfully\n");
 		printf("------------------------------------------------------------\n");
@@ -397,13 +468,11 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 {
 	pthread_cond_signal(&condc);
 	pthread_mutex_unlock(&the_mutex);
+
 	if(DEBUG)
 		printf("Producer released locks\n");
 
 	struct dg_payload recv_pload;
-	struct timeval timeout;
-	timeout.tv_sec = 0;
-	timeout.tv_usec = 100000;
 
 	printf("Sending the FIN_ACK to server\n");
 	fd_set monitor_fds;
@@ -414,7 +483,8 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 	FIN_STATE:
 		sendAcknowledgement(sockfd, pload.ts, pload.seq_number + 1, 1, FIN_ACK);
 		FD_SET(sockfd, &monitor_fds);
-		if(select(sockfd+1, &monitor_fds, NULL, NULL, &timeout) < 0)
+		timeout.tv_sec = 1;
+		if(select(sockfd+1, &monitor_fds, NULL, NULL, &timeout) == 0)
 		{
 			goto FIN_STATE;
 		}
@@ -450,35 +520,44 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 	memset(&send_pload,0,sizeof(send_pload));
 	bool is_probe_req = false;
 	bool is_port_number_packet = false;
+	bool is_server_timeout = false;
 
 	switch(type)
 	{
 		case WINDOW_PROBE:
-			send_pload.type = htons(type);
-			send_pload.windowSize = htons(windowSize);
-			send_pload.ts=htonl(ts);
+			send_pload.type = type;
+			send_pload.windowSize = windowSize;
+			send_pload.ts=ts;
 			is_probe_req = true;
 			break;
 		case PORT_NUMBER:
 			is_port_number_packet = true;
+			type = ACK;
+		case SERVER_TIMEOUT:
+			is_server_timeout = true;
+			type = ACK;
 		default:
-			send_pload.ts=htonl(ts);;
-			send_pload.ack = htonl(ack);
-			send_pload.windowSize = htons(windowSize);
-			send_pload.type = htons(type);
+			send_pload.ts=ts;
+			send_pload.ack = ack;
+			send_pload.windowSize = windowSize;
+			send_pload.type = type;
+			server_seq_num = send_pload.ack-1;
 			break;
 	}
 
-	if(is_probe_req || is_port_number_packet || !is_in_limits(prob))
+	server_seq_num = send_pload.ack-1;
+	if(is_probe_req || is_port_number_packet || is_server_timeout || !is_in_limits(prob))
 	{
-		server_seq_num = ntohl(send_pload.ack)-1;
-		sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
+		send_pload = convertToNetworkOrder(send_pload);
+		if(sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0) < 0){
+			printf("Error on send : %s\n",strerror(errno));
+		}
 		printf("Sent acknowledgment with sequence number : %d with window size %d \n", ntohl(send_pload.ack), ntohs(send_pload.windowSize));
 	}
 	else
 	{
 		num_of_acks_dropped++;
-		printf("Intentionally not sending acknowledgment for sequence number: %d\n", send_pload.seq_number);
+		printf("Intentionally not sending acknowledgment for sequence number: %d\n", ack-1);
 	}
 }
 
@@ -529,6 +608,7 @@ void* printData(void *ptr)
 
 	if(DEBUG)
 		printf("Sleep time in thread %u\n", sleepTime);
+
 	while(!printDataBuff())
 	{
 		threadSleep = (sleepTime * (-1 * (log((double)(rand()/(double)RAND_MAX)))));
@@ -578,8 +658,10 @@ bool popData()
 {
 
 	while(front != rear || front -> type == FIN){
+
 		if(front -> type == FIN)
 		{
+
 			if(DEBUG)
 			{
 				printf("Popped the FIN packet in printer thread\n");
@@ -596,6 +678,8 @@ bool popData()
 			printf("\nPrinting data packet sequence number is %d\n", front->seqNum);
 			printf("%s", front->buff);
 		}
+
+		fflush(stdout);
 
 		if(DEBUG)
 		{
@@ -621,5 +705,6 @@ bool popData()
 		return false;
 	}
 
+	printf("\n");
 	return false;
 }
