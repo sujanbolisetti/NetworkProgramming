@@ -318,7 +318,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	printf("Received an Ack from the client for the port Number packet\n");
 	alarm(0);
 	printf("Connection Established Succesfully\n");
-	printf("-------------Sending File data...-------------\n");
 
 	int k = 0;
 	isMetaDataTransfer = false;
@@ -333,7 +332,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	int temp_seq = seqNum++;
 	int fd;
 	if((fd = open(file_name,O_RDONLY)) < 0){
-		printf("***************Error in opening the file :%s\n*********************",strerror(errno));
+		printf("*********************Error in opening the file :%s*********************",strerror(errno));
 		FIN_STATE:
 				printf("Closing the connection with the client\n");
 				Send_Packet(conn_sockfd,temp_seq,"Error in opening the file : No Such file or directory exists",FIN,rtt_ts(&rttinfo));
@@ -371,6 +370,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		}
 
 
+
 	/**
 	 *  Ackindex -> 1
 	 *  Initial CWND -> 1
@@ -391,6 +391,8 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	bool receiveWindowFull = false;
 	bool windowEmpty = false;
 	bool isFull=false;
+
+	printf("-------------Sending File data-------------\n");
 
 	for(;;){
 
@@ -529,6 +531,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 				if(pload.type==FIN_ACK){
 					printf("Received FIN_ACK from client\n");
+					printf("........Completed File Transfer Successfully.........");
 					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
 					alarm(0);
 					isTimeWaitState=true;

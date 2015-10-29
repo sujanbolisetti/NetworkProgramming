@@ -689,7 +689,7 @@ bool popData()
 			return true;
 		}
 
-		if(DEBUG)
+		if(!DEBUG)
 		{
 			printf("\nPrinting data packet sequence number is %d\n", front->seqNum);
 			printf("%s", front->buff);

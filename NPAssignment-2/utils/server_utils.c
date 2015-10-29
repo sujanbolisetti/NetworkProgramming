@@ -20,7 +20,9 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 			if(buff != NULL){
 				strcpy(send_pload.buff,buff);
 			}
-			printf("Completed File Transfer and waiting for Acks...\n");
+			if(DEBUG)
+				printf("Completed File Transfer and waiting for Acks...\n");
+
 			break;
 		case ACK:
 			printf("Sending an ACK ....\n");
