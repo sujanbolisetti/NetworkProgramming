@@ -239,7 +239,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
-	printf("Server Child is running on IP-Address :%s with port number :%d\n",IPServer,ntohs(serverAddr.sin_port));
+	printf("Server Child is running on IP-Address :%s with port number :%d\n",sock_info->ip_address,ntohs(serverAddr.sin_port));
 
 	memset(&pload,0,sizeof(pload));
 
@@ -330,12 +330,13 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	 */
 	headNode = BuildCircularLinkedList(sliding_window);
 
+	int temp_seq = seqNum++;
 	int fd;
 	if((fd = open(file_name,O_RDONLY)) < 0){
 		printf("***************Error in opening the file :%s\n*********************",strerror(errno));
 		FIN_STATE:
 				printf("Closing the connection with the client\n");
-				Send_Packet(conn_sockfd,seqNum++,"Error in opening the file : No Such file or directory exists",FIN,rtt_ts(&rttinfo));
+				Send_Packet(conn_sockfd,temp_seq,"Error in opening the file : No Such file or directory exists",FIN,rtt_ts(&rttinfo));
 				fileNotExists = true;
 				alarm(rtt_start(&rttinfo)/1000);
 
@@ -347,7 +348,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					alarm(0);
 					if(pload.type == FIN_ACK){
 						/* Sending the final ACK */
-						Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
+						Send_Packet(conn_sockfd,temp_seq+1,NULL,ACK,rtt_ts(&rttinfo));
 						isTimeWaitState = true;
 						/* Considering the Maximum MSL as 2 sec */
 						/* After 2 seconds we will conclude the ACK is delivered correctly*/
@@ -433,7 +434,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				 	 if (sigsetjmp(jmpbuf, 1) != 0) {
 						printf("received sigalrm retransmitting\n");
 						if (rtt_timeout(&rttinfo) < 0) {
-							printf("Reached Maximum retransmission attempts : No response from the server giving up\n");
+							printf("Reached Maximum retransmission attempts : No response from the client so giving up\n");
 							rttinit = 0;	/* reinit in case we're called again */
 							errno = ETIMEDOUT;
 							exit(0);
@@ -594,7 +595,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		fclose(fp);
 		printf("Statistics\n");
 		printf("--------------------------------------------------------------------\n");
-		printf("Number of packets sent from the sender sliding window :%d\n",sentpackets_count_first_time);
+		printf("Number of packets sent (Excluding Retransmissions) :%d\n",sentpackets_count_first_time);
 		printf("Number of retransissions due to TimeOuts Count :%d\n",timeout_restransmission_count);
 		printf("Number of times retransmission due 3 DUP ACKs :%d\n",dup_ack_3_count);
 		printf("--------------------------------------------------------------------\n");

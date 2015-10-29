@@ -52,7 +52,7 @@ char* printCongestionState(int congestion_state_id){
 	case CONGESTION_AVOIDANCE:
 		return "Congestion Avoidance";
 	case FAST_RECOVERY:
-		return "Fast Receovery";
+		return "Fast Recovery";
 	}
 }
 
