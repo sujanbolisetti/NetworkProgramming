@@ -99,6 +99,16 @@ PERSITENT MODE:
 CLEAN CLOSE:
 ------------
 
+Server:
+	We have a packet type FIN which the server will be sending on reaching EOF. On receiving the FIN packet the client will send a FIN ACK to the server. The server then sends a ACK and enters the TIME_WAIT state(waits for 4 sec) same as TCP to keep track of this ACK. If the server doesn't receive any reply from the client until 4 (2MSL) secs it assumes the ack packet has reached successfully and exits.
+
+Client
+	On the client side we have backed the FIN_ACK with a timer. So in case the last ACK is lost then the client will transmit the FIN_ACK until it receives an ACK from server. On receiving this ACK the client quits.
+
+MSL: Maximum Segment Lifetime.
+
+In the parent sever we are handling sig_child signal and using waitpid() sys call to clean the child process.(This will prevent the child to become zombie)  
+
 ----------------------------------------------------------------------------------------
 CLIENT SIDE
 ----------------------------------------------------------------------------------------

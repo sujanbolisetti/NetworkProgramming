@@ -350,8 +350,8 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						Send_Packet(conn_sockfd,temp_seq+1,NULL,ACK,rtt_ts(&rttinfo));
 						isTimeWaitState = true;
 						/* Considering the Maximum MSL as 2 sec */
-						/* After 2 seconds we will conclude the ACK is delivered correctly*/
-						alarm(2);
+						/* After 4 seconds we will conclude the ACK is delivered correctly*/
+						alarm(4);
 					}else{
 						goto FIN_STATE;
 					}
@@ -536,7 +536,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					alarm(0);
 					isTimeWaitState=true;
 					/*setting the alarm for last ACK*/
-					alarm(2);
+					alarm(4);
 					goto receive;
 				}
 
