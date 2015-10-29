@@ -2,7 +2,7 @@
  * server.c
  *
  *  Created on: Oct 4, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 #include "usp.h"

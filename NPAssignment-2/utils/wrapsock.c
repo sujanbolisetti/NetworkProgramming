@@ -2,7 +2,7 @@
  * wrapsock.c
  *
  *  Created on: Oct 5, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 #include "../src/usp.h"

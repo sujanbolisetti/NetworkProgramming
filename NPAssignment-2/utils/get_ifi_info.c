@@ -2,7 +2,7 @@
  * get_ifi_info.c
  *
  *  Created on: Oct 5, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 #include   "../src/unpifi.h"

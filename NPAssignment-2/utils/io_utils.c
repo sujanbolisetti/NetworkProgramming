@@ -2,7 +2,7 @@
  * io_utils.c
  *
  *  Created on: Oct 10, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 #include "../src/usp.h"

@@ -2,7 +2,7 @@
  * constants.h
  *
  *  Created on: Oct 7, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 #ifndef CONSTANTS_H_

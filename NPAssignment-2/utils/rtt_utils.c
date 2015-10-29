@@ -2,7 +2,7 @@
  * rtt_utils.c
  *
  *  Created on: Oct 14, 2015
- *      Author: sujan
+ *      Authors: sujan, sidhartha
  */
 
 #include	"../src/unprtt.h"

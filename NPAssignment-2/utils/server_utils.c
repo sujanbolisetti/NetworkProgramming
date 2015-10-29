@@ -2,7 +2,7 @@
  * server_utils.c
  *
  *  Created on: Oct 19, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 #include "../src/usp.h"
 

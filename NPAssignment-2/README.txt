@@ -2,9 +2,43 @@ GROUP MEMBERS:
 -------------
 	Sujan Bolisetti (109797364) (NetId: sbolisetti)
 	Sidhartha Thota (109888134) (NetId: sthota)
-----------------------------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------------------
 
-Our Packet Structure:
+COMPILING THE PROJECT:
+----------------------
+
+Pre-requisites:
+1. Make
+2. GCC compiler
+
+Compiling:
+1. Download the tar file from the blackboard and place it in a new folder
+2. Untar the tar file using the command "xxx"
+3. Compile the project using "make all" command
+4. Now the folder has all the necessary executables to run the project
+5. Please place "server.in" and "client.in" files in this folder to successful execution of the program
+6. Please also place the text file in this folder that is to be transmitted to client
+
+RUNNING THE PROJECT:
+--------------------
+Before running the project, it needs to be compiled (Instructions to compile the project)
+1. Open the folder in two terminals (One to run the server and another to run the client)
+2. Running the server:
+	a. Open one of the terminal
+	b. Run the server using command "./server"
+	c. On successful run, it shows port number it is running and the interface details
+3. Running the client:
+	a. Open the other terminal
+	b. Run the client using command "./client"
+	c. Now it starts the client with file transfer mechanism
+
+
+-------------------------------------------------------------------------------------------------------------------------------
+IMPLEMENTATION DETAILS
+-------------------------------------------------------------------------------------------------------------------------------
+
+OUR PACKET STRUCTURE:
+---------------------
 	(Inspired from TCP RFC)
 
 Packet Size: 512 Bytes
@@ -26,8 +60,6 @@ Bits
 +----------------------------------------------------------------------------------------------------+ 
 |                                         Data (Payload) [496 Bytes]				     |	
 +----------------------------------------------------------------------------------------------------+       
-
-
 
 MODIFICATIONS OF STEVEN'S TO BOUND ONLY UNICAST ADDRESSES:
 ----------------------------------------------------------
@@ -83,7 +115,8 @@ Client accepts all the packets based on random function and probability provided
 
 USAGE OF TEMPORARY BUFFER:
 --------------------------
-We have also used temporary buffer (not shared) to store the packets when we get packets other than expected packet. 
+We have also used temporary buffer (not shared) to store the packets when we get packets other than expected packet. This is NOT an ADDITIONAL BUFFER. The size of receiver window never exceeds its capacity due to this buffer. We also use the packets in this buffer while calculating the Receiver Window Size (see below). 
+  
 For example: Server sent the sequence of packets in the order 31, 32, 33, 34, 35, 36 ...
 
 1. Receiver accepts the 31 and placed in shared circular list and sends ack 32.

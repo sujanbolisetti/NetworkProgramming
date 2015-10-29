@@ -106,3 +106,15 @@ void printTempBuff(struct dg_payload* data_temp_buff, int windowSize)
 	printf("\n");
 }
 
+char* getAckType(uint32_t ackType){
+	printf("Ack type : %u\n", ackType);
+	switch(ackType)
+	{
+		case ACK:
+			return "ACK";
+		case FIN_ACK:
+			return "FIN_ACK";
+		case WINDOW_PROBE:
+			return "WINDOW_PROBE";
+	}
+}

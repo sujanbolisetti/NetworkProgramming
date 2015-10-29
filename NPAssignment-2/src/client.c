@@ -2,7 +2,7 @@
  * client.c
  *
  *  Created on: Oct 7, 2015
- *      Author: sujan
+ *      Authors: sujan, sidhartha
  */
 #include "usp.h"
 #include  "unpifi.h"
@@ -566,7 +566,11 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 		if(sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0) < 0){
 			printf("Error on send : %s\n",strerror(errno));
 		}
-		printf("Sent acknowledgment with sequence number : %d with window size %d \n", ntohl(send_pload.ack), ntohs(send_pload.windowSize));
+
+		if(!is_probe_req)
+		{
+			printf("Sent acknowledgment type %s with sequence number : %d and window size %d \n", getAckType(ntohs(send_pload.type)), ntohl(send_pload.ack), ntohs(send_pload.windowSize));
+		}
 	}
 	else
 	{
@@ -580,7 +584,7 @@ int getWindowSize(uint32_t windowSize, int temp_buff_size)
 	if(DEBUG)
 	{
 		printf("Receiver window size : %d\n", windowSize);
-		printf("Data buffer size : %d\n", filled_circular_buffer_size);
+		printf("Data buffer size : %d\n", filled_circular_buffer_size + 1);
 		printf("Data temp buffer size : %d\n", temp_buff_size);
 	}
 
@@ -607,7 +611,8 @@ bool printDataBuff()
 
 	isFinReceived = popData();
 	if(isFinReceived){
-		printf("FIN Received\n");
+		if(DEBUG)
+			printf("FIN Received\n");
 	}
 	isFilled = false;
 	pthread_cond_signal(&condp);

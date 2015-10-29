@@ -2,7 +2,7 @@
  * usp.h
  *
  *  Created on: Oct 4, 2015
- *      Author: sujan
+ *      Authors: sujan, sidhartha
  */
 
 
@@ -213,6 +213,8 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob);
 struct dg_payload convertToNetworkOrder(struct dg_payload pload);
 
 char* printCongestionState(int congestion_state_id);
+
+char* getAckType(uint32_t ackType);
 
 // UDP packet types
 enum PACKET_TYPE

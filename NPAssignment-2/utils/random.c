@@ -2,7 +2,7 @@
  * random.c
  *
  *  Created on: Oct 16, 2015
- *      Author: sujan
+ *       Authors: sujan, sidhartha
  */
 
 
