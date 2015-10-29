@@ -53,8 +53,11 @@ Initially the sender (server) will be in slow start phase where his cwnd will be
 
 The sender will always send the min(cwnd, received_window_size) count of packets to the client. The sender will update the receiver window size from the acknowledgement received from the client.  
 
-Persitent Mode:
-	The sender will enter into persistent mode when the receiver window locks(the receiver window is full)
+PERSITENT MODE:
+
+	The sender will enter into persistent mode when the receiver window locks(the receiver window is full). The client will send an ack when the receiver window increases, but there might me a chance that this ack is lost and acks are not retransimtted as they are not backed by a timer. So the sender and receiver can go into a deadlock. To handle this situation, the sender(Server) will send packets of type WINDOW_PROBE, starting from 1 sec and does a exponential back(Max 4 secs) and never gives up. So, as in the previous even if the ack is lost from the client, the server can get window size update surely at some later time and continue the transfer again. We have used packet type WINDOW PROBE to identify window probe packets. 
+
+CLEAN CLOSE:
 
 
 
