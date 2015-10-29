@@ -410,9 +410,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					windowEmpty = true;
 			}
 
-			if(receiveWindowFull){
-				printf("Sender Sliding is Full..... Hence locking the Window\n");
-			}
+//			if(receiveWindowFull){
+//				printf("Sender Sliding is Full..... Hence locking the Window\n");
+//			}
 
 			/**
 			 *  We will not sent any packets for these conditions:
