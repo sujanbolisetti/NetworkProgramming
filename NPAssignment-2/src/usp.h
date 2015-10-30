@@ -137,7 +137,7 @@ void Getpeername(int sockfd,struct sockaddr *sa, int* length);
 void Getsockname(int sockfd,struct sockaddr *sa, int* length);
 
 void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClient,
-		struct flow_metadata *flow_data, char *file_name);
+		struct flow_metadata *flow_data, char *file_name,char *client_addr);
 
 void Fscanf(FILE *fp, char *format, void *data);
 
@@ -179,7 +179,7 @@ unsigned int rand_interval(unsigned int, unsigned int);
 bool is_in_limits(float);
 
 void
-congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state);
+congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state,char *client_addr);
 
 int
 Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts);
