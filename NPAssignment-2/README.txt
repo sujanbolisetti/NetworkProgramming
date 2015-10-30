@@ -63,7 +63,7 @@ Bits
 
 MODIFICATIONS OF STEVEN'S TO BOUND ONLY UNICAST ADDRESSES:
 ----------------------------------------------------------
-	On calling get_ifi_info method with arguments “inet” and “1” (to get the aliases), we are getting the interface details. We are checking that the interface is UP and reading the address only from the ifi_addr structure (Which are essentially unicast address). Ignoring the address from ifi_brdaddr structure as they are broadcast address and we also haven’t bound the wild card address. (Actually Steven’s code already filters the broadcast address by using the flag IFF_BROADCAST flag)
+	On calling get_ifi_info method with arguments “inet” and “1” (to get the aliases), we are getting the interface details. We are checking if the interface is UP and reading the address only from the ifi_addr structure (Which are essentially unicast address). Ignoring the address from ifi_brdaddr structure as they are broadcast address and we also haven’t bound the wild card address. (Actually Steven’s code already filters the broadcast address by using the flag IFF_BROADCAST flag)
 Implementation of array of structures:
 	We have used a linked list for holding the bonded socket information. Each node in the linked list is a structure containing:  sockfd, IP address bound to the socket, network mask for the IP address, subnet address. Kindly refer to usp.h for seeing the binded_sock_info structure.
 
@@ -78,7 +78,7 @@ We are setting the alarm to RTO value before sending the data packet and recalcu
 SERVER SLIDING WINDOW IMPLEMENTATION:
 --------------------------------------
 
-	We are maintaining the sender sliding window in the form of circular linked list, to which we maintain two pointers sentNode and ackNode. The sentNode -> dictates, what is the next packet to send to the client (in case of window size > 0) and ackNode dictates -> what is the next packet for which we are expecting the acknowledgement. So basically we are waiting for the last un-acked packet. In case of time out we will retransfer the last unacked packet to the client. We will refill the sliding window with the data once the open space is available (I mean we got ack’s for few packets in the sliding window then we can remove them and store new packets.)
+	We are maintaining the sender sliding window in the form of circular linked list, to which we maintain two pointers sentNode and ackNode. The sentNode dictates -> what is the next packet to send to the client (in case of window size > 0) and ackNode dictates -> what is the next packet for which we are expecting the acknowledgement. So basically we are waiting for the last un-acked packet. In case of time out we will retransfer the last unacked packet to the client. We will refill the sliding window with the data once the open space is available (I mean we got ack’s for few packets in the sliding window then we can remove them and store new packets.)
 
 CONGESTION CONTROL:
 -------------------
