@@ -5,7 +5,7 @@ int getPacket(struct dg_payload *pload, struct dg_payload *data_temp_buff, int s
 	int i;
 	for(i = 0; i < windowSize; i++)
 	{
-		if(data_temp_buff[i].seq_number == seq_num)
+		if(data_temp_buff[i].seq_number == seq_num && data_temp_buff[i].type != USED)
 		{
 			pload->ack = data_temp_buff[i].ack;
 			strcpy(pload->buff, data_temp_buff[i].buff);
@@ -26,7 +26,7 @@ int storePacket(struct dg_payload pload, struct dg_payload* data_temp_buff, int 
 	bool isPresent = false;
 	for(i = 0; i < windowSize; i++)
 	{
-		if(pload.seq_number == data_temp_buff[i].seq_number)
+		if(pload.seq_number == data_temp_buff[i].seq_number && data_temp_buff[i].type != USED)
 		{
 			isPresent = true;
 			if(DEBUG)
@@ -107,7 +107,9 @@ void printTempBuff(struct dg_payload* data_temp_buff, int windowSize)
 }
 
 char* getAckType(uint32_t ackType){
-	printf("Ack type : %u\n", ackType);
+	if(DEBUG)
+		printf("Ack type : %u\n", ackType);
+
 	switch(ackType)
 	{
 		case ACK:

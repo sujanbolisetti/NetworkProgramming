@@ -307,6 +307,7 @@ bool populateDataList(FILE **fp,struct Node* ackNode,bool isFull){
 					printf("value of n : %d\n",n);
 				}
 
+				memset(rearNode->buff,0,sizeof(rearNode->buff));
 				rearNode->type = FIN;
 
 				if(DEBUG){

@@ -126,6 +126,7 @@ int main(int argc, char **argv){
 
 				printf("Server Socket running on IpAddress:PortNumber - %s:%d has received a Connection fromm the client running on IpAddress:PortNumber - %s\n",temp->ip_address,portNumber,ipAddressSocket);
 
+				fflush(stdout);
 				/*
 				 *  If the client is already connected then this is datagram
 				 *  is a part of retransmission hence we will ignore this
@@ -291,7 +292,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 		signalHandling:
 			if (sigsetjmp(jmpbuf, 1) != 0) {
-				printf("received a sigalrm\n");
+
+				if(DEBUG)
+					printf("received a sigalrm\n");
+
 				if (rtt_timeout(&rttinfo) < 0) {
 					printf("Reached Maximum retransmission attempts : No response from the client so giving up\n");
 					rttinit = 0;	/* reinit in case we're called again */
@@ -434,7 +438,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 				senddatagain:
 				 	 if (sigsetjmp(jmpbuf, 1) != 0) {
-						printf("received sigalrm retransmitting\n");
+
+				 		 if(DEBUG)
+				 			 printf("received sigalrm retransmitting\n");
+
 						if (rtt_timeout(&rttinfo) < 0) {
 							printf("Reached Maximum retransmission attempts : No response from the client so giving up\n");
 							rttinit = 0;	/* reinit in case we're called again */
@@ -442,12 +449,16 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 							exit(0);
 						}
 						if(isMetaDataTransfer){
-							printf("Meta data retransmit\n");
+							if(DEBUG)
+								printf("Meta data retransmit\n");
 							goto sendagain;
 						}else if(isTimeWaitState){
 							printf("Client has closed the connection hence the closing the server child\n");
 							goto done;
 						}else if(window_size > 0){
+							if(DEBUG){
+								printf("Time Wait State :%d\n",isTimeWaitState);
+							}
 							printf("TimeOut....Retransmitting\n");
 							congestion_control(TIME_OUT,&cwnd,&ssthresh,&duplicateAckCount,&state);
 							isRetransmit=true;
@@ -469,6 +480,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						if(DEBUG)
 							printf("send payload time stamp :%u\n",rtt_ts(&rttinfo));
 						if(sentNode->type == FIN){
+							printf("Sending FIN packet\n");
 							fin_flag = 1;
 						}
 						sentpackets_count_first_time++;
@@ -484,7 +496,9 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				}
 
 			receive:
-				printf("Waiting for Ack...\n");
+				if(!isTimeWaitState){
+					printf("Waiting for Ack...\n");
+				}
 				memset(&pload,0,sizeof(pload));
 				sigprocmask(SIG_UNBLOCK,&sigset_alrm,NULL);
 				if(Recvfrom(conn_sockfd, &pload, sizeof(pload), 0, NULL, NULL) < 0){
@@ -500,7 +514,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				if(pload.type == WINDOW_PROBE){
 					printf("Received the Ack n response for Window Probe :%d\n",pload.windowSize);
 					goto window_size_update;
-				}else{
+				}else if(pload.type == ACK){
 					printf("Received the ack with Number : %d and Window Size %d\n",pload.ack,pload.windowSize);
 				}
 
@@ -529,17 +543,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 				}
 
 
-				if(pload.type==FIN_ACK){
-					printf("Received FIN_ACK from client\n");
-					printf("........Completed File Transfer Successfully.........");
-					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
-					alarm(0);
-					isTimeWaitState=true;
-					/*setting the alarm for last ACK*/
-					alarm(4);
-					goto receive;
-				}
-
 				//int diff = pload.ack-1- ackNode->seqNum;
 
 				/**
@@ -561,9 +564,19 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					}
 				}
 
-//			if(diff > 1){
-//				printf("Received Cummulative Ack :%d hence skipping %d packets\n",pload.ack,diff);
-//			}
+				if(pload.type==FIN_ACK){
+						printf("Received FIN_ACK from client\n");
+						printf("Completed File Transfer Successfully\n");
+						Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
+						alarm(0);
+						isTimeWaitState=true;
+						/*setting the alarm for last ACK*/
+						alarm(4);
+						if (sigsetjmp(jmpbuf, 1) != 0) {
+							goto done;
+						}
+						goto receive;
+				}
 
 			window_size_update:
 				window_size = pload.windowSize;

@@ -403,7 +403,7 @@ int main(int argc,char **argv){
 									printf("Received FIN packet from server\n");
 									if(recv_pload.buff!=NULL)
 										printf("%s\n",recv_pload.buff);
-									closeConnection(sockfd, recv_pload, prob);
+									closeConnection(new_sockfd, recv_pload, prob);
 									goto cleanClose;
 								}
 								memset(&recv_pload, 0, sizeof(recv_pload));
@@ -434,8 +434,7 @@ int main(int argc,char **argv){
 					else
 					{
 						storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
-						if(DEBUG)
-							printf("Packet stored in data_temp_buff %d\n", recv_pload.seq_number);
+						printf("Packet stored in additional Buffer with seq number %d\n", recv_pload.seq_number);
 						sendAcknowledgement(new_sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 					}
 
@@ -558,6 +557,10 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 			send_pload.type = ACK;
 			server_seq_num = send_pload.ack-1;
 			break;
+		case FIN_ACK:
+			send_pload.type = FIN_ACK;
+			server_seq_num = send_pload.ack-1;
+			break;
 	}
 
 	if(is_probe_req || is_port_number_packet || is_server_timeout || !is_in_limits(prob))
@@ -569,7 +572,7 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 
 		if(!is_probe_req)
 		{
-			printf("Sent acknowledgment type %s with sequence number : %d and window size %d \n", getAckType(ntohs(send_pload.type)), ntohl(send_pload.ack), ntohs(send_pload.windowSize));
+			printf("Sent acknowledgment type %s with ack number : %d and window size %d \n", getAckType(ntohs(send_pload.type)), ntohl(send_pload.ack), ntohs(send_pload.windowSize));
 		}
 	}
 	else
@@ -696,8 +699,8 @@ bool popData()
 
 		if(!DEBUG)
 		{
-			printf("\nPrinting data packet sequence number is %d\n", front->seqNum);
-			printf("%s", front->buff);
+			printf("\n###Printing data packet sequence number is %d\n", front->seqNum);
+			printf("%s\n", front->buff);
 		}
 
 		fflush(stdout);
@@ -717,9 +720,10 @@ bool popData()
 	{
 		if(!DEBUG)
 		{
-			printf("\nPrinting data packet sequence number is %d\n", front->seqNum);
-			printf("%s", front->buff);
+			printf("\n####Printing data packet sequence number is %d\n", front->seqNum);
+			printf("%s\n", front->buff);
 		}
+		fflush(stdout);
 
 		filled_circular_buffer_size--;
 		front = NULL;
