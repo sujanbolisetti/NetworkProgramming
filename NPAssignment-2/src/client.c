@@ -129,8 +129,9 @@ int main(int argc,char **argv){
 	bzero(&serverAddr,sizeof(serverAddr));
 
 	if(inet_pton(AF_INET,IPServer,&serverAddr.sin_addr) < 0){
-		printf("Inet_ptonN error\n");
+		printf("Inet_pton error\n");
 	}
+
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(portNumber);
 	IPClient.sin_family = AF_INET;
@@ -157,22 +158,30 @@ int main(int argc,char **argv){
 	printf("--------------------------------------------------\n");
 	printInterfaceDetails(head);
 
-	/**
-	 * Checking the server address is local
-	 * else assigning a random address
-	 */
-	if(maxMatch == 0 && !isLoopBack){
-		temp = head;
-		while(temp!=NULL){
-			if(strcmp(temp->ip_address,LOOPBACK_ADDRESS) != 0){
-				inet_pton(AF_INET,temp->ip_address,&IPClient.sin_addr);
-			}
-			temp=temp->next;
-		}
-		printf("------------Server Host is not in the Local Network to the Client-------------\n");
+
+	if(isServerInSameHost(head,IPServer)){
+		printf("Server is in same host as client. Hence assigning loop back address to client\n");
+		inet_pton(AF_INET,LOOPBACK_ADDRESS,&IPClient.sin_addr);
+		printf("Using 127.0.0.1 as server address at client\n");
+		inet_pton(AF_INET,LOOPBACK_ADDRESS,&serverAddr.sin_addr);
 	}else{
-		printf("------------Server Host is in Local Network to the Client. Hence setting the socket option MSG_DONTROUTE------------\n");
-		setsockopt(sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
+		/**
+		 * Checking the server address is local
+		 * else assigning a random address
+		 */
+		if(maxMatch == 0 && !isLoopBack){
+			temp = head;
+			while(temp!=NULL){
+				if(strcmp(temp->ip_address,LOOPBACK_ADDRESS) != 0){
+					inet_pton(AF_INET,temp->ip_address,&IPClient.sin_addr);
+				}
+				temp=temp->next;
+			}
+			printf("------------Server Host is not in the Local Network to the Client-------------\n");
+		}else{
+			printf("------------Server Host is in Local Network to the Client. Hence setting the socket option MSG_DONTROUTE------------\n");
+			setsockopt(sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
+		}
 	}
 
 	sockfd = Socket(AF_INET,SOCK_DGRAM,0);

@@ -126,7 +126,7 @@ int main(int argc, char **argv){
 
 				printf("Server socket (%s:%d) received a connection from client (%s)\n",temp->ip_address,portNumber,ipAddressSocket);
 
-				fflush(stdout);
+
 				/*
 				 *  If the client is already connected then this is datagram
 				 *  is a part of retransmission hence we will ignore this
@@ -138,7 +138,9 @@ int main(int argc, char **argv){
 						break;
 				}
 
-				printf("(%s:%d) Forking a child for handling client connection (sending the file with name): %s\n",temp->ip_address,portNumber,file_name);
+				printf("(%s:%d) Forking a child for handling client connection (sending the file with name): %s\n",temp->ip_address,portNumber,pload.buff);
+
+				fflush(stdout);
 
 				if((pid = fork()) == 0){
 					flow_data = (struct flow_metadata*)malloc(sizeof(struct flow_metadata));
@@ -189,6 +191,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	bool isLocal=false;
 	int conn_sockfd;
 	char IPServer[128];
+	char ipAddress_client[128];
 	struct sockaddr_in serverAddr;
 	int length = sizeof(serverAddr);
 	struct sockaddr_in networkMaskAddr;
@@ -225,22 +228,32 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	cwnd = 1;
 	ssthresh = window_size/2;
 
-	inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
-
 	serverAddr.sin_port = 0;
 	serverAddr.sin_family = AF_INET;
-	Bind(conn_sockfd,(SA *)&serverAddr,sizeof(serverAddr));
 
 	inet_pton(AF_INET,sock_info->network_mask,&networkMaskAddr.sin_addr);
 
-	getClientIPAddress(&IPClient,&networkMaskAddr,&serverAddr,NULL,&matchNumber);
+	inet_ntop(AF_INET,&IPClient.sin_addr,ipAddress_client,sizeof(ipAddress_client));
 
-	if(matchNumber > 0){
-		printf("(%s) Client Host is in Local Network to the Server. Hence setting the socket option MSG_DONTROUTE\n",client_addr);
-		setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
+	if(strcmp(ipAddress_client, LOOPBACK_ADDRESS) == 0){
+		printf("(%s) Client is in the same host.Hence assigning loop back address to server\n",client_addr);
+		inet_pton(AF_INET,LOOPBACK_ADDRESS,&serverAddr.sin_addr);
 	}else{
-		printf("(%s) Client Host is not in Local Network to the Server\n",client_addr);
+
+		isClientLocal(&IPClient,&networkMaskAddr,&serverAddr,NULL,&matchNumber);
+
+		if(matchNumber > 0){
+			printf("(%s) Client Host is in Local Network to the Server. Hence setting the socket option MSG_DONTROUTE\n",client_addr);
+			setsockopt(conn_sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
+		}else{
+			printf("(%s) Client Host is not in Local Network to the Server\n",client_addr);
+		}
+
+		inet_pton(AF_INET,sock_info->ip_address,&serverAddr.sin_addr);
 	}
+
+	Bind(conn_sockfd,(SA *)&serverAddr,sizeof(serverAddr));
+
 
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
@@ -343,7 +356,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		printf("(%s) *********************Error in opening the file : %s*********************",client_addr,strerror(errno));
 		printf("(%s) Closing the connection with the client\n",client_addr);
 		FIN_STATE:
-				Send_Packet(conn_sockfd,temp_seq,"Client requested file doesn't exist at server",FIN,rtt_ts(&rttinfo));
+				Send_Packet(conn_sockfd,temp_seq,"Client requested file doesn't exist at server",FIN,rtt_ts(&rttinfo),client_addr);
 				fileNotExists = true;
 				alarm(rtt_start(&rttinfo)/1000);
 
@@ -355,7 +368,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					alarm(0);
 					if(pload.type == FIN_ACK){
 						/* Sending the final ACK */
-						Send_Packet(conn_sockfd,temp_seq+1,NULL,ACK,rtt_ts(&rttinfo));
+						Send_Packet(conn_sockfd,temp_seq+1,NULL,ACK,rtt_ts(&rttinfo),client_addr);
 						isTimeWaitState = true;
 						/* Considering the Maximum MSL as 2 sec */
 						/* After 4 seconds we will conclude the ACK is delivered correctly*/
@@ -402,6 +415,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 	bool receiveWindowFull = false;
 	bool windowEmpty = false;
 	bool isFull=false;
+	bool skippingFlag = false;
 
 	printf("(%s) -------------Starting the file data transfer-------------\n",client_addr);
 
@@ -465,7 +479,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 							goto senddatagain;
 						}else if(isWindowSizeZero){
 							printf("(%s) Persistent Mode... Window Size equals to zero... so sending window probe\n",client_addr);
-							Send_Packet(conn_sockfd,INT_MAX,NULL,WINDOW_PROBE,rtt_ts(&rttinfo));
+							Send_Packet(conn_sockfd,INT_MAX,NULL,WINDOW_PROBE,rtt_ts(&rttinfo),client_addr);
 							goto receive;
 						}
 					}
@@ -473,10 +487,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					if(isRetransmit){
 						alarm(rtt_start(&rttinfo)/1000);
 						timeout_restransmission_count++;
-						Send_Packet(conn_sockfd,ackNode->seqNum,ackNode->buff,ackNode->type,rtt_ts(&rttinfo));
+						Send_Packet(conn_sockfd,ackNode->seqNum,ackNode->buff,ackNode->type,rtt_ts(&rttinfo),client_addr);
 						printf("(%s) Retransmiting the Data Packet with sequence number : %d\n",client_addr,ackNode->seqNum);
 					}else{
-						sentNode->seqNum = Send_Packet(conn_sockfd,seqNum++,sentNode->buff,sentNode->type,rtt_ts(&rttinfo));
+						sentNode->seqNum = Send_Packet(conn_sockfd,seqNum++,sentNode->buff,sentNode->type,rtt_ts(&rttinfo),client_addr);
 						if(DEBUG)
 							printf("(%s) send payload time stamp :%u\n",client_addr,rtt_ts(&rttinfo));
 						if(sentNode->type == FIN){
@@ -497,7 +511,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 			receive:
 				if(!isTimeWaitState){
-					printf("Waiting for Ack...\n");
+					printf("(%s) Waiting for Ack...\n",client_addr);
 				}
 				memset(&pload,0,sizeof(pload));
 				sigprocmask(SIG_UNBLOCK,&sigset_alrm,NULL);
@@ -515,20 +529,29 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 					printf("(%s) Received a window size for Window Probe : %d\n",client_addr,pload.windowSize);
 					goto window_size_update;
 				}
-//				}else if(pload.type == ACK){
-//					printf("(%s:%d) Received an packet with acknowledgement number : %d with receiver window size %d\n",pload.ack,pload.windowSize);
-//				}
 
 				/**
 				 * We will move the ackNode in case the ackNode seqNumber is less
 				 * than the received acknowledgement number and also the ackNode
 				 * should not cross the sentNode.
 				 */
-				printf("(%s) Received an packet with acknowledgement number : %d with receiver window size %d\n "
-						"so skippping packets with sequence numbers : ",client_addr,pload.ack,pload.windowSize);
+				printf("(%s) Received an packet with acknowledgement number : %d with receiver window size %d\n ",
+																				client_addr,pload.ack,pload.windowSize);
+
+				if(!skippingFlag)
+						skippingFlag=true;
+
 				while(pload.ack > 0 && ackNode->seqNum <= pload.ack-1
 						&& ackNode != sentNode && pload.type == ACK){
 					//printf("(%s:%d) Received the packet with acknowledgement number : %d so skipping packet with seq number: %d\n", pload.ack,ackNode->seqNum);
+
+
+					if(skippingFlag){
+						printf("so skipping packets with sequence number ");
+						skippingFlag = false;
+					}
+
+
 					printf("%d ",ackNode->seqNum);
 					ackNode->ack = ackNode->seqNum;
 					ackNode= ackNode->next;
@@ -558,6 +581,10 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 						congestion_control(DUPLICATE_3_ACK,&cwnd,&ssthresh,&duplicateAckCount,&state,client_addr);
 						dup_ack_3_count++;
 						if(window_size > 0){
+							if(isWindowSizeZero){
+								isWindowSizeZero = false;
+								alarm(0);
+							}
 							isRetransmit=true;
 							goto senddatagain;
 						}else{
@@ -570,7 +597,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 				if(pload.type==FIN_ACK){
 					printf("(%s) Received FIN_ACK from client\n",client_addr);
-					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo));
+					Send_Packet(conn_sockfd,seqNum++,NULL,ACK,rtt_ts(&rttinfo),client_addr);
 					alarm(0);
 					isTimeWaitState=true;
 					/*setting the alarm for last ACK*/
@@ -614,12 +641,15 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 		alarm(0);
 		close(conn_sockfd);
 		fclose(fp);
-		printf("(%s) Completed file transfer successfully\n",client_addr);
+
+		if(isTimeWaitState)
+			printf("(%s) Completed file transfer successfully\n",client_addr);
+
 		printf("(%s) Statistics\n",client_addr);
 		printf("--------------------------------------------------------------------\n");
 		printf("(%s) Number of packets sent (Excluding retransmissions) : %d\n",client_addr,sentpackets_count_first_time);
 		printf("(%s) Number of retransmissions due to Time-outs : %d\n",client_addr,timeout_restransmission_count);
-		printf("(%s) Number of retransmission due to 3 duplicate acks : %d\n",client_addr,dup_ack_3_count);
+		printf("(%s) Number of retransmission due to 3 duplicate acks (Fast Retransmit) : %d\n",client_addr,dup_ack_3_count);
 		printf("--------------------------------------------------------------------\n");
 		fflush(stdout);
 		deleteCircularLinkedList(headNode);
@@ -675,7 +705,7 @@ congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *stat
 			}
 			break;
 		case DUPLICATE_3_ACK:
-			printf("(%s) Received 3 duplicate acknowledgements\n",client_addr);
+			printf("(%s) Received 3 duplicate acknowledgements--FAST RETRANSMIT\n",client_addr);
 			if(*state == SLOW_START || *state == CONGESTION_AVOIDANCE){
 				double d = (double)(*cwnd);
 				*ssthresh = *cwnd/2 + 1;//ceil(d/2.0);
@@ -699,10 +729,11 @@ congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *stat
 			printf("(%s) Received a new successful acknowledgement",client_addr);
 			if(*state == SLOW_START){
 				*cwnd=*cwnd+1;
-				if(*cwnd >= *ssthresh)
+				if(*cwnd >= *ssthresh){
 					printf(" (cwnd >= ssthresh)");
 					*state = CONGESTION_AVOIDANCE;
 					congestion_avoidance = 0;
+				}
 			}else if(*state == CONGESTION_AVOIDANCE){
 				if(congestion_avoidance == 2){
 					*cwnd=*cwnd + 1;

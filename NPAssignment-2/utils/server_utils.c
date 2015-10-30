@@ -6,7 +6,7 @@
  */
 #include "../src/usp.h"
 
-int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
+int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts,char *client_addr){
 
 	struct dg_payload send_pload;
 
@@ -25,10 +25,10 @@ int Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts){
 
 			break;
 		case ACK:
-			printf("Sending an ACK ....\n");
+			printf("(%s) Sending an ACK ....\n",client_addr);
 			break;
 		case WINDOW_PROBE:
-			printf("Sending an window_probe ....\n");
+			printf("(%s) Sending an window_probe ....\n",client_addr);
 			break;
 		case PAYLOAD:
 			strcpy(send_pload.buff,buff);

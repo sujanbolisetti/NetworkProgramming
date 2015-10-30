@@ -17,7 +17,21 @@ void Fscanf(FILE *fp, char *format, void *data){
 	}
 }
 
-void getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
+bool isServerInSameHost(struct binded_sock_info *head,char *IPServer){
+
+	struct binded_sock_info *temp = head;
+
+	while(temp!=NULL){
+
+		if(strcmp(IPServer,temp->ip_address)==0){
+			return true;
+		}
+		temp= temp->next;
+	}
+	return false;
+}
+
+void isClientLocal(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
 			struct sockaddr_in *IPClient,unsigned long *maxMatch){
 
 	unsigned long clientNetworkPortion = clientAddr->sin_addr.s_addr & networkAddr->sin_addr.s_addr;
@@ -70,7 +84,7 @@ struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
 				struct sockaddr_in *netAddr = (struct sockaddr_in *)if_temp->ifi_ntmaddr;
 
 				if(serverAddr!=NULL){
-					getClientIPAddress(addr,netAddr,serverAddr,IPClient,maxMatch);
+					isClientLocal(addr,netAddr,serverAddr,IPClient,maxMatch);
 				}
 
 				inet_ntop(AF_INET,&netAddr->sin_addr,bsock_info->network_mask,sizeof(bsock_info->network_mask));

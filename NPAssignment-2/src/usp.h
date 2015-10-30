@@ -118,6 +118,8 @@ void    Pthread_create(pthread_t *, const pthread_attr_t *,
 
 char* create_error_message(char *error_msg,int errorno);
 
+bool isServerInSameHost(struct binded_sock_info *head,char *IPServer);
+
 void
 Pthread_detach(pthread_t tid);
 
@@ -141,7 +143,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 void Fscanf(FILE *fp, char *format, void *data);
 
-void getClientIPAddress(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
+void isClientLocal(struct sockaddr_in *clientAddr,struct sockaddr_in *networkAddr, struct sockaddr_in *serverAddr,
 			struct sockaddr_in *IPClient,unsigned long* maxMatch);
 
 struct binded_sock_info* getInterfaces(int portNumber,unsigned long *maxMatch,
@@ -182,7 +184,7 @@ void
 congestion_control(int how,int *cwnd, int *ssthresh, int *duplicateAck,int *state,char *client_addr);
 
 int
-Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts);
+Send_Packet(int conn_sockfd,int seq, char *buff, int type, uint32_t ts,char* client_addr);
 
 void sendAcknowledgement(int sockfd, uint32_t ts, uint32_t seq, uint32_t windowSize, uint32_t type);
 
