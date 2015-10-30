@@ -7,8 +7,6 @@
 #include "usp.h"
 #include  "unpifi.h"
 
-#define	RTT_DEBUG 0
-
 #define MAX_RESTRANSMISSION_CLIENT 10
 
 static struct rtt_info rttinfo;
@@ -31,7 +29,6 @@ int num_of_packets_dropped = 0;
 int num_of_acks_dropped = 0;
 
 struct timeval timeout;
-
 
 // Temporary file pointers
 FILE *fp_output;
@@ -93,7 +90,7 @@ int main(int argc,char **argv){
 	printf("Client window size : %d\n", windowSize);
 	printf("Random seed to discard a packet : %d\n", randomSeed);
 	printf("Probability of discarding a packet : %f\n", prob);
-	printf("Sleep time of printer thread %u in milli seconds\n", sleepPrinterInSecs);
+	printf("Sleep time of printer thread %u in milliseconds\n", sleepPrinterInSecs);
 	printf("--------------------------------------------------\n");
 
 	setRandomSeed(randomSeed);
@@ -156,7 +153,7 @@ int main(int argc,char **argv){
 	/**
 	 *  We are printing the interface information to STDOUT.
 	 */
-	printf("Client Interfaces and their details\n");
+	printf("Client interfaces and its details\n");
 	printf("--------------------------------------------------\n");
 	printInterfaceDetails(head);
 
@@ -172,9 +169,9 @@ int main(int argc,char **argv){
 			}
 			temp=temp->next;
 		}
-		printf("------------Server Host is not in the Local Network as the Client-------------\n");
+		printf("------------Server Host is not in the Local Network to the Client-------------\n");
 	}else{
-		printf("------------Server Host is Local Network as the Client. Hence setting the socket option MSG_DONTROUTE------------\n");
+		printf("------------Server Host is in Local Network to the Client. Hence setting the socket option MSG_DONTROUTE------------\n");
 		setsockopt(sockfd,SOL_SOCKET,MSG_DONTROUTE,&optval,sizeof(int));
 	}
 
@@ -186,7 +183,7 @@ int main(int argc,char **argv){
 
 	inet_ntop(AF_INET,&IPClient.sin_addr,clientIP,sizeof(clientIP));
 
-	printf("Client is running on IP-Address :%s with Port Number :%d\n",clientIP, ntohs(IPClient.sin_port));
+	printf("Client is running on IP-Address : %s with Port Number : %d\n",clientIP, ntohs(IPClient.sin_port));
 
 	if(connect(sockfd,(SA *)&serverAddr,sizeof(serverAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
@@ -199,7 +196,7 @@ int main(int argc,char **argv){
 
 	inet_ntop(AF_INET,&peerAddress.sin_addr,IPServer,sizeof(IPServer));
 
-	printf("Connecting to server running on IPAddress :%s on well known portNumber :%d\n",IPServer,ntohs(peerAddress.sin_port));
+	printf("Connecting to server running on IP-Address : %s on well known port number : %d\n",IPServer,ntohs(peerAddress.sin_port));
 
 	if (rttinit == 0) {
 		rtt_init(&rttinfo);		/* first time we're called */
@@ -229,14 +226,14 @@ int main(int argc,char **argv){
 
 		if(!is_in_limits(prob)){
 			sendto(sockfd,(void *)&send_pload,sizeof(send_pload),0,NULL,0);
-			printf("Client has sent the file Name to server... Waiting for the server child port number\n");
+			printf("Client has sent the file name %s to server... waiting for the server child port number\n", fileName);
 		}else{
-			printf("Dropping the packet containing the fileName with seqNum :%d\n",send_pload.seq_number);
+			printf("Dropping the packet containing the file name with sequence number : %d\n", send_pload.seq_number);
 			goto sendagain;
 		}
 
 		if (sigsetjmp(jmpbuf, 1) != 0) {
-			printf("Timeout occurred so retransmitting the packet with FileName....\n");
+			printf("Timeout occurred so retransmitting the packet with file name...\n");
 			if (rtt_timeout(&rttinfo) < 0) {
 				printf("Maximum retransmission attempts done. No response from the server so giving up\n");
 				rttinit = 0;	/* reinit in case we're called again */
@@ -273,13 +270,13 @@ int main(int argc,char **argv){
 
 	Bind(new_sockfd,(SA *)&IPClient,sizeof(IPClient));
 
-	printf("Connecting to server running on IPAddress :%s on ephemeral portNumber :%d\n",IPServer,serverChildPortNumber);
+	printf("Connecting to server running on IP-Address : %s on ephemeral port number : %d\n",IPServer,serverChildPortNumber);
 
 	if(connect(new_sockfd,(SA *)&newServerAddr,sizeof(newServerAddr)) < 0){
 		printf("Connection Error :%s",strerror(errno));
 	}else{
 		if(DEBUG)
-			printf("Socket is connected in client\n");
+			printf("Socket is connected to client\n");
 	}
 
 	uint32_t ts = recv_pload.ts;
@@ -288,13 +285,13 @@ int main(int argc,char **argv){
 
 	if(DEBUG)
 	{
-		printf("Sent the acknowledgment :%d to tell server that port number is received\n", recv_pload.seq_number + 1);
+		printf("Sent an acknowledgment : %d to tell server that port number is received\n", recv_pload.seq_number + 1);
 	}
 
 	// Create the printer thread
 	pthread_create(&printer, NULL, printData, &sleepPrinterInSecs);
-	printf("Connection Established with the Server.............\n");
-	printf("Started printer/consumer thread successfully\n");
+	printf("Connection Established with the Server...\n");
+	printf("Started Printer thread successfully\n");
 
 	fd_set monitor_fds;
 
@@ -302,7 +299,7 @@ int main(int argc,char **argv){
 
 	for(;;){
 
-		printf("Client is waiting for data packet....\n");
+		printf("Client is waiting for data packet...\n");
 		SELECT:
 
 			FD_SET(new_sockfd, &monitor_fds);
@@ -311,9 +308,8 @@ int main(int argc,char **argv){
 
 			if(select(new_sockfd+1, &monitor_fds, NULL, NULL, &timeout) == 0){
 
-				if(transmission_count == MAX_RESTRANSMISSION_CLIENT){
-
-					printf("Server is not responding.... Quitting the client\n");
+				if(transmission_count == MAX_RESTRANSMISSION_CLIENT) {
+					printf("Server is not responding... So, quitting the client\n");
 					exit(0);
 				}
 
@@ -337,14 +333,14 @@ int main(int argc,char **argv){
 					exit(0);
 				}
 
-				transmission_count=0;
+				transmission_count = 0;
 				recv_pload = convertToHostOrder(recv_pload);
 
 				uint32_t ts = recv_pload.ts;
 				uint32_t seq = recv_pload.seq_number + 1;
 
 				if(recv_pload.type == WINDOW_PROBE){
-					printf("Received window probe request. Sending the current window size for window probe segment\n");
+					printf("Received window probe request. Sending the current window size : %d\n", getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)));
 					sendAcknowledgement(new_sockfd, ts, INT_MAX,
 							getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), WINDOW_PROBE);
 					continue;
@@ -434,7 +430,7 @@ int main(int argc,char **argv){
 					else
 					{
 						storePacket(recv_pload, data_temp_buff, WINDOW_SIZE);
-						printf("Packet stored in additional Buffer with seq number %d\n", recv_pload.seq_number);
+						printf("Packet stored in additional Buffer with sequence number : %d\n", recv_pload.seq_number);
 						sendAcknowledgement(new_sockfd, ts, required_seq_num, getWindowSize(windowSize, getUsedTempBuffSize(data_temp_buff, WINDOW_SIZE)), ACK);
 					}
 
@@ -456,7 +452,7 @@ int main(int argc,char **argv){
 	}
 
 	cleanClose:
-		printf("Waiting for printer thread to exit\n");
+		printf("Waiting for printer thread to exit...\n");
 		pthread_join(printer, NULL);
 		printf("Done with the file transfer\n");
 		close(new_sockfd);
@@ -509,7 +505,7 @@ void closeConnection(int sockfd, struct dg_payload pload, float prob)
 					recv_pload = convertToHostOrder(recv_pload);
 					if(!is_in_limits(prob)){
 						if(recv_pload.type == ACK){
-							printf("Received the ACK for FIN_ACK packet received\n");
+							printf("Received the ACK for FIN_ACK packet sent\n");
 							return;
 						}
 						else{
@@ -572,7 +568,7 @@ sendAcknowledgement(int sockfd, uint32_t ts, uint32_t ack, uint32_t windowSize, 
 
 		if(!is_probe_req)
 		{
-			printf("Sent acknowledgment type %s with ack number : %d and window size %d \n", getAckType(ntohs(send_pload.type)), ntohl(send_pload.ack), ntohs(send_pload.windowSize));
+			printf("Sent acknowledgment type %s with acknowledgment number : %d and window size %d \n", getAckType(ntohs(send_pload.type)), ntohl(send_pload.ack), ntohs(send_pload.windowSize));
 		}
 	}
 	else
@@ -699,7 +695,7 @@ bool popData()
 
 		if(!DEBUG)
 		{
-			printf("\n###Printing data packet sequence number is %d\n", front->seqNum);
+			printf("\nPrinting data packet sequence number : %d\n", front->seqNum);
 			printf("%s\n", front->buff);
 		}
 
@@ -720,7 +716,7 @@ bool popData()
 	{
 		if(!DEBUG)
 		{
-			printf("\n####Printing data packet sequence number is %d\n", front->seqNum);
+			printf("\nPrinting data packet sequence number : %d\n", front->seqNum);
 			printf("%s\n", front->buff);
 		}
 		fflush(stdout);
