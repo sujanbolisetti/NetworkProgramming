@@ -547,7 +547,7 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 
 					if(skippingFlag){
-						printf("so skipping packets with sequence number ");
+						printf("(%s) so skipping packets with sequence number ",client_addr);
 						skippingFlag = false;
 					}
 
