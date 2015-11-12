@@ -18,6 +18,12 @@
 
 #define ETH_FRAME_LEN 1518
 
+#define DEBUG 0
+
+#define ODR_GRP_TYPE 7364
+
+#define ETH_HDR_LEN 14
+
 //#define VM1 "130.245.156.21"
 //
 //#define VM2 "130.245.156.22"

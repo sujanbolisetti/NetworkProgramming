@@ -1,6 +1,6 @@
-#include <errno.h>		/* error numbers */
+//#include <errno.h>		/* error numbers */
 #include <sys/ioctl.h>          /* ioctls */
-#include <net/if.h>             /* generic interface structures */
+//#include <net/if.h>             /* generic interface structures */
 
 #include "hw_addrs.h"
 #include "usp.h"
@@ -45,6 +45,14 @@ get_hw_addrs()
 	for(i = 0; i < nInterfaces; i++)  {
 		item = &ifr[i];
  		alias = 0; 
+ 		if(strcmp(item->ifr_name,"lo") || strcmp(item->ifr_name,"eth0")){
+
+ 			if(DEBUG)
+ 				printf("Entered into lo | eth0 interface\n");
+
+ 			continue;
+ 		}
+
 		hwa = (struct hwa_info *) calloc(1, sizeof(struct hwa_info));
 		memcpy(hwa->if_name, item->ifr_name, IF_NAME);		/* interface name */
 		hwa->if_name[IF_NAME-1] = '\0';
@@ -93,7 +101,7 @@ Get_hw_addrs()
 	struct hwa_info	*hwa;
 
 	if ( (hwa = get_hw_addrs()) == NULL)
-		printf("Error in getting the hw_address\n");
+		printf("No Hardware Address found\n");
 	return(hwa);
 }
 

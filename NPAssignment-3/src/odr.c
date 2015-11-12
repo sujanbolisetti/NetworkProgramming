@@ -25,7 +25,7 @@ int main(){
 	printf("Starting ODR process on %s\n",Gethostbyname(my_name));
 
 	sockfd = socket(AF_LOCAL,SOCK_DGRAM,0);
-	pf_sockfd = socket(AF_PACKET, SOCK_RAW, htons(32765));
+	pf_sockfd = create_pf_socket();
 
 	if(pf_sockfd < 0){
 		printf("error in PF_Socket creation :%s\n",strerror(errno));
@@ -46,111 +46,131 @@ int main(){
 
 	maxfd = max(sockfd,pf_sockfd)+1;
 
-	select(maxfd,&rset,NULL,NULL,NULL);
+	for(;;){
 
-	if(FD_ISSET(sockfd,&rset)){
-			struct reply_from_ODR *reply = msg_receive(sockfd);
+		FD_SET(sockfd, &rset);
 
-			/*our MAC address*/
-			unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+		FD_SET(pf_sockfd,&rset);
 
-			/*other host MAC address*/
-			unsigned char dest_mac[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+		printf("Waiting for select\n");
 
-			void* buffer = (void*)malloc(ETH_FRAME_LEN);
+		select(maxfd,&rset,NULL,NULL,NULL);
 
-			unsigned char* etherhead = buffer;
+		if(FD_ISSET(sockfd,&rset)){
 
-			unsigned char* data = buffer + 14;
+			struct reply_from_uds_client *reply = msg_receive(sockfd);
 
-			struct ethhdr *eh = (struct ethhdr *)etherhead;
+			if(is_route_exists(reply->canonical_ipAddress)){
 
-			int send_result = 0;
+			}else{
 
-			socket_address.sll_family   = PF_PACKET;
+				/**
+				 *  1. Broadcast a rreq packet to all the interfaces.
+				 *  2. Wait for rreply from the destination.
+				 *  3. Fill in the routing table and send the payload.
+				 */
 
-			socket_address.sll_ifindex  = 3;
 
-			//socket_address.sll_hatype   = ARPHRD_ETHER;
 
-			/*target is another host*/
-			socket_address.sll_pkttype  = PACKET_BROADCAST;
-
-			socket_address.sll_protocol = htons(32765);
-
-			/*address length*/
-			socket_address.sll_halen    = ETH_ALEN;
-			/*MAC - begin*/
-			socket_address.sll_addr[0]  = 0xff;
-			socket_address.sll_addr[1]  = 0xff;
-			socket_address.sll_addr[2]  = 0xff;
-			socket_address.sll_addr[3]  = 0xff;
-			socket_address.sll_addr[4]  = 0xff;
-			socket_address.sll_addr[5]  = 0xff;
-			/*MAC - end*/
-			socket_address.sll_addr[6]  = 0x00;/*not used*/
-			socket_address.sll_addr[7]  = 0x00;/*not used*/
-
-			int j=0;
-
-			/*set the frame header*/
-			memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
-			memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
-			eh->h_proto = 0x00;
-			/*fill the frame with some data*/
-			for (j = 0; j < 1500; j++) {
-				data[j] = (unsigned char)((int) (255.0*rand()/(RAND_MAX+1.0)));
-			}
-
-			mh.msg_name = (caddr_t)&socket_address;
-			mh.msg_namelen =  sizeof(struct sockaddr_ll);
-
-			iov[0].iov_base = buffer;
-			iov[0].iov_len = strlen(buffer);
-
-			mh.msg_iov = iov;
-
-			mh.msg_iovlen = 1;
-
-			mh.msg_control = NULL;
-			mh.msg_controllen = 0;
-
-			//sendmsg(pf_sockfd, &mh,0);
-			send_result = sendto(pf_sockfd, buffer, ETH_FRAME_LEN, 0,
-				      (struct sockaddr*)&socket_address, sizeof(socket_address));
-
-			if(send_result < 0){
-				printf("send to failed\n");
 			}
 
 
-	}
 
-	if(FD_ISSET(pf_sockfd,&rset)){
+//				/*our MAC address*/
+//				unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
+//
+//				/*other host MAC address*/
+//				unsigned char dest_mac[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
+//
+//				void* buffer = (void*)malloc(300);
+//
+//				unsigned char* etherhead = buffer;
+//
+//				unsigned char* data = buffer + 14;
+//
+//				struct ethhdr *eh = (struct ethhdr *)etherhead;
+//
+//				int send_result = 0;
+//
+//				socket_address.sll_family   = AF_PACKET;
+//
+//				socket_address.sll_ifindex  = 2;
+//
+//				//socket_address.sll_hatype   = ARPHRD_ETHER;
+//
+//				/*target is another host*/
+//				socket_address.sll_pkttype  = PACKET_BROADCAST;
+//
+//				socket_address.sll_protocol = htons(32765);
+//
+//				/*address length*/
+//				socket_address.sll_halen    = ETH_ALEN;
+//				/*MAC - begin*/
+//				socket_address.sll_addr[0]  = 0xff;
+//				socket_address.sll_addr[1]  = 0xff;
+//				socket_address.sll_addr[2]  = 0xff;
+//				socket_address.sll_addr[3]  = 0xff;
+//				socket_address.sll_addr[4]  = 0xff;
+//				socket_address.sll_addr[5]  = 0xff;
+//				/*MAC - end*/
+//				socket_address.sll_addr[6]  = 0x00;/*not used*/
+//				socket_address.sll_addr[7]  = 0x00;/*not used*/
+//
+//				int j=0;
+//
+//				/*set the frame header*/
+//				memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
+//				memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
+//				eh->h_proto = 0x00;
+//
+//				mh.msg_name = (caddr_t)&socket_address;
+//				mh.msg_namelen =  sizeof(struct sockaddr_ll);
+//
+//				iov[0].iov_base = buffer;
+//				iov[0].iov_len = strlen(buffer);
+//
+//				mh.msg_iov = iov;
+//
+//				mh.msg_iovlen = 1;
+//
+//				mh.msg_control = NULL;
+//				mh.msg_controllen = 0;
+//
+//				//sendmsg(pf_sockfd, &mh,0);
+//				send_result = sendto(pf_sockfd, buffer, 300, 0,
+//						  (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
+//
+//				if(send_result < 0){
+//					printf("send to failed %s \n",strerror(errno));
+//				}
 
-		printf("Received packet from other ODR\n");
 
-		setsockopt(pf_sockfd,IPPROTO_IP,IP_PKTINFO,&optval,sizeof(int));
+		}
 
-		void* buffer = (void*)malloc(ETH_FRAME_LEN); /*Buffer for ethernet frame*/
-		int length = 0; /*length of the received frame*/
-		//recvmsg(pf_sockfd,&mh,0);
-		length = recvfrom(pf_sockfd, buffer, ETH_FRAME_LEN, 0, NULL, NULL);
+		if(FD_ISSET(pf_sockfd,&rset)){
 
-		struct cmsghdr *cmsg;
+			printf("Received packet from other ODR\n");
 
-		cmsg = CMSG_FIRSTHDR(&mh);
+			setsockopt(pf_sockfd,IPPROTO_IP,IP_PKTINFO,&optval,sizeof(int));
 
-		if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_PKTINFO) {
-			interface_index = ((struct in_pktinfo*)CMSG_DATA(cmsg))->ipi_ifindex;
-		    printf("message received on address %d\n", interface_index);
-		 }
+			void* buffer = (void*)malloc(ETH_FRAME_LEN); /*Buffer for ethernet frame*/
+			int length = 0; /*length of the received frame*/
+			//recvmsg(pf_sockfd,&mh,0);
+			length = recvfrom(pf_sockfd, buffer, 300, 0, NULL, NULL);
 
-		gethostname(my_name,sizeof(my_name));
-		printf("message received on %s",
-				Gethostbyname(my_name));
+			if(length < 0){
+				printf("Error in recvfrom\n");
+			}
+
+			setsockopt(pf_sockfd,IPPROTO_IP,IP_PKTINFO,&optval,sizeof(int));
 
 
+			gethostname(my_name,sizeof(my_name));
+			printf("message received on %s\n",
+					Gethostbyname(my_name));
+
+
+		}
 	}
 }
 

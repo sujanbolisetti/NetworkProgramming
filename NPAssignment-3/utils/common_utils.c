@@ -63,9 +63,9 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 
 }
 
-struct reply_from_ODR * msg_receive(int sockfd){
+struct reply_from_uds_client * msg_receive(int sockfd){
 
-	struct reply_from_ODR *reply = (struct reply_from_ODR *)malloc(sizeof(struct reply_from_ODR));
+	struct reply_from_uds_client *reply = (struct reply_from_ODR *)malloc(sizeof(struct reply_from_ODR));
 	char* msg_odr = (char *)malloc(sizeof(char)*1024);
 	memset(reply, '\0', sizeof(struct reply_from_ODR));
 

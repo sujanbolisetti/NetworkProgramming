@@ -52,6 +52,8 @@
 
 #include <linux/if_arp.h>
 
+#include <stdbool.h>
+
 #define SA struct sockaddr
 
 #define	min(a,b)	((a) < (b) ? (a) : (b))
@@ -63,10 +65,31 @@ struct vm_info{
 	struct vm_info *next;
 };
 
-struct reply_from_ODR{
+struct reply_from_uds_client{
 	char* msg_received;
 	char* canonical_ipAddress;
 	int* portNumber;
+};
+
+struct route_entry{
+
+	int inf_index;
+	char *canonical_ipAddress;
+	char *destination_mac_address;
+	char *next_hop_address;
+	int hop_count;
+	int time_stamp;
+
+};
+
+struct odr_hdr{
+
+
+};
+
+struct odr_frame{
+
+
 };
 
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
