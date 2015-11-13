@@ -69,7 +69,9 @@ int main(){
 
 		memset(server_vm_name,'\0',sizeof(server_vm_name));
 
-		scanf("%s",server_vm_name);
+		if(scanf("%s",server_vm_name) < 0){
+			printf("Scanf failed with error:%s\n",strerror(errno));
+		}
 
 		printf("client node at %s sending the request to server at %s\n",my_name,server_vm_name);
 

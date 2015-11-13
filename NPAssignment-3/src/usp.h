@@ -44,7 +44,7 @@
 
 #include <error.h>
 
-#include	<sys/un.h>
+#include <sys/un.h>
 
 #include <linux/if_packet.h>
 
@@ -53,6 +53,8 @@
 #include <linux/if_arp.h>
 
 #include <stdbool.h>
+
+#include "hw_addrs.h"
 
 #define SA struct sockaddr
 
@@ -68,34 +70,55 @@ struct vm_info{
 struct reply_from_uds_client{
 	char* msg_received;
 	char* canonical_ipAddress;
-	int* portNumber;
+	int portNumber;
+	int flag;
 };
 
 struct route_entry{
 
-	int inf_index;
-	char *canonical_ipAddress;
-	char *destination_mac_address;
-	char *next_hop_address;
+	char dest_canonical_ipAddress[20];
+	char next_hop_mac_address[ETH_ALEN];
+	int outg_inf_index;
 	int hop_count;
 	int time_stamp;
-
+	struct route_entry *next;
 };
+
 
 struct odr_hdr{
 
-
+	char cn_src_ipaddr[20];
+	char cn_dsc_ipaddr[20];
+	uint16_t hop_count;
+	uint16_t pkt_type;
+	uint16_t force_route_dcvry;
+	int broadcast_id;
+	uint16_t rreply_sent;
 };
 
+/**
+ * 150 bytes as of now and may increase :P
+ */
 struct odr_frame{
 
-
+	struct odr_hdr hdr;
+	char payload[80];
 };
+
+
+struct odr_frame_node
+{
+	struct odr_frame frame;
+	struct odr_frame_node *next;
+};
+
+
+void odr_init();
 
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag);
 
-struct reply_from_ODR * msg_receive(int sockfd);
+struct reply_from_uds_client * msg_receive(int sockfd);
 
 char *
 get_vm_ipaddress(char *vm_name,struct vm_info *head);
@@ -115,8 +138,14 @@ Gethostbyname(char *my_name);
 char *
 Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
 
+struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
+			int frc_dsc,int rreply_sent,char *pay_load);
 
+int is_inefficient_rreq_exists(struct odr_frame *frame);
 
+void remove_rreq_frame(struct odr_frame *frame);
+
+void store_rreq_frame(struct odr_frame *frame);
 
 
 #endif /* USP_H_ */

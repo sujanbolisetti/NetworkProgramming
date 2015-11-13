@@ -20,9 +20,30 @@
 
 #define DEBUG 0
 
-#define ODR_GRP_TYPE 7364
+#define ODR_GRP_TYPE 1800
 
 #define ETH_HDR_LEN 14
+
+#define R_REQ 0
+
+#define R_REPLY 1
+
+#define PAY_LOAD 2
+
+#define ZERO_HOP_COUNT 0
+
+#define R_REPLY_NOT_SENT 0
+
+#define R_REPLY_SENT 1
+
+#define EHTR_FRAME_SIZE sizeof(struct odr_frame) + ETH_HDR_LEN
+
+#define INEFFICIENT_R_REQ_EXISTS 1
+
+#define EFFICIENT_R_REQ_EXISTS 0
+
+#define R_REQ_NOT_EXISTS 2
+
 
 //#define VM1 "130.245.156.21"
 //

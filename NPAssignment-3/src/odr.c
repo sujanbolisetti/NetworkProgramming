@@ -11,18 +11,21 @@ int main(){
 
 	int sockfd,pf_sockfd,maxfd;
 	struct sockaddr_un odr_addr;
-	struct sockaddr_ll socket_address;
+	struct sockaddr_ll addr_ll;
 	fd_set rset;
 	struct iovec iov[1];
 	struct msghdr mh;
 	char my_name[128];
 	unsigned int interface_index;
-
-	int optval=1;
+	int broadcast_id=0;
+	struct odr_frame frame;
+	char my_ip_address[20];
 
 	gethostname(my_name,sizeof(my_name));
 
-	printf("Starting ODR process on %s\n",Gethostbyname(my_name));
+	strcpy(my_ip_address,Gethostbyname(my_name));
+
+	printf("Starting ODR process on %s\n",my_name);
 
 	sockfd = socket(AF_LOCAL,SOCK_DGRAM,0);
 	pf_sockfd = create_pf_socket();
@@ -46,13 +49,16 @@ int main(){
 
 	maxfd = max(sockfd,pf_sockfd)+1;
 
+	odr_init();
+
 	for(;;){
 
 		FD_SET(sockfd, &rset);
 
 		FD_SET(pf_sockfd,&rset);
 
-		printf("Waiting for select\n");
+		if(DEBUG)
+			printf("Waiting for select\n");
 
 		select(maxfd,&rset,NULL,NULL,NULL);
 
@@ -60,6 +66,7 @@ int main(){
 
 			struct reply_from_uds_client *reply = msg_receive(sockfd);
 
+			// have to exclude this even when force_route_discovery.
 			if(is_route_exists(reply->canonical_ipAddress)){
 
 			}else{
@@ -70,108 +77,70 @@ int main(){
 				 *  3. Fill in the routing table and send the payload.
 				 */
 
+				frame = build_odr_frame(my_ip_address,reply->canonical_ipAddress,
+						ZERO_HOP_COUNT,R_REQ,broadcast_id++,reply->flag,R_REPLY_NOT_SENT,NULL);
 
-
+				send_frame_rreq(pf_sockfd,-1,&frame);
 			}
-
-
-
-//				/*our MAC address*/
-//				unsigned char src_mac[6] = {0x00, 0x0c, 0x29, 0x49, 0x3f, 0x65};
-//
-//				/*other host MAC address*/
-//				unsigned char dest_mac[6] = {0xff, 0xff, 0xff, 0xff, 0xff, 0xff};
-//
-//				void* buffer = (void*)malloc(300);
-//
-//				unsigned char* etherhead = buffer;
-//
-//				unsigned char* data = buffer + 14;
-//
-//				struct ethhdr *eh = (struct ethhdr *)etherhead;
-//
-//				int send_result = 0;
-//
-//				socket_address.sll_family   = AF_PACKET;
-//
-//				socket_address.sll_ifindex  = 2;
-//
-//				//socket_address.sll_hatype   = ARPHRD_ETHER;
-//
-//				/*target is another host*/
-//				socket_address.sll_pkttype  = PACKET_BROADCAST;
-//
-//				socket_address.sll_protocol = htons(32765);
-//
-//				/*address length*/
-//				socket_address.sll_halen    = ETH_ALEN;
-//				/*MAC - begin*/
-//				socket_address.sll_addr[0]  = 0xff;
-//				socket_address.sll_addr[1]  = 0xff;
-//				socket_address.sll_addr[2]  = 0xff;
-//				socket_address.sll_addr[3]  = 0xff;
-//				socket_address.sll_addr[4]  = 0xff;
-//				socket_address.sll_addr[5]  = 0xff;
-//				/*MAC - end*/
-//				socket_address.sll_addr[6]  = 0x00;/*not used*/
-//				socket_address.sll_addr[7]  = 0x00;/*not used*/
-//
-//				int j=0;
-//
-//				/*set the frame header*/
-//				memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
-//				memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
-//				eh->h_proto = 0x00;
-//
-//				mh.msg_name = (caddr_t)&socket_address;
-//				mh.msg_namelen =  sizeof(struct sockaddr_ll);
-//
-//				iov[0].iov_base = buffer;
-//				iov[0].iov_len = strlen(buffer);
-//
-//				mh.msg_iov = iov;
-//
-//				mh.msg_iovlen = 1;
-//
-//				mh.msg_control = NULL;
-//				mh.msg_controllen = 0;
-//
-//				//sendmsg(pf_sockfd, &mh,0);
-//				send_result = sendto(pf_sockfd, buffer, 300, 0,
-//						  (struct sockaddr*)&socket_address, sizeof(struct sockaddr_ll));
-//
-//				if(send_result < 0){
-//					printf("send to failed %s \n",strerror(errno));
-//				}
-
-
 		}
 
 		if(FD_ISSET(pf_sockfd,&rset)){
 
-			printf("Received packet from other ODR\n");
+			printf("%s received packet from other ODR\n",my_name);
 
-			setsockopt(pf_sockfd,IPPROTO_IP,IP_PKTINFO,&optval,sizeof(int));
+			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
+			int length = 0;
+			int addr_len = sizeof(addr_ll);
 
-			void* buffer = (void*)malloc(ETH_FRAME_LEN); /*Buffer for ethernet frame*/
-			int length = 0; /*length of the received frame*/
-			//recvmsg(pf_sockfd,&mh,0);
-			length = recvfrom(pf_sockfd, buffer, 300, 0, NULL, NULL);
+			length = recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len);
 
 			if(length < 0){
-				printf("Error in recvfrom\n");
+				printf("Error in recvfrom %s\n",strerror(errno));
 			}
 
-			setsockopt(pf_sockfd,IPPROTO_IP,IP_PKTINFO,&optval,sizeof(int));
+			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
+
+			if(DEBUG)
+				printf("ip-address %s\n",received_frame->hdr.cn_dsc_ipaddr);
+
+			if(is_frame_belongs_to_me(received_frame->hdr.cn_dsc_ipaddr, my_ip_address))
+			{
+				printf("Its my packet\n");
+				// TODO: send R_REPLY_SENT
+				build_rreply_frame(received_frame);
+				exit(0);
+			}
+			else
+			{
+				received_frame->hdr.hop_count++;
+
+				int result = is_inefficient_rreq_exists(received_frame);
+
+				if(result == INEFFICIENT_R_REQ_EXISTS || result == R_REQ_NOT_EXISTS){
+
+					if(result == R_REQ_NOT_EXISTS){
+						store_rreq_frame(received_frame);
+					}
+					// TODO: populate R_REPLY_SENT flag
+
+					send_frame_rreq(pf_sockfd,addr_ll.sll_ifindex,received_frame);
+				}else{
+					printf("Not flooding rreq as efficient one's exists\n");
+				}
+			}
 
 
 			gethostname(my_name,sizeof(my_name));
-			printf("message received on %s\n",
-					Gethostbyname(my_name));
 
+			printf("message received on %s\n",my_ip_address);
 
 		}
 	}
+}
+
+int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)
+{
+	return !strcmp(dest_ip_addr, my_ip_addr);
 }
 
 

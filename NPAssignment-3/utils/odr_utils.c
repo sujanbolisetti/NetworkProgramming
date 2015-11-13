@@ -7,23 +7,33 @@
 
 #include "../src/usp.h"
 
-struct hwa_info	*hw_head = get_hw_addrs();
-
 //int pf_sockfd = create_pf_socket();
 
-char BROADCAST_MAC_ADDRESS[6]=  {'ff','ff','ff','ff','ff','ff'};
+char BROADCAST_MAC_ADDRESS[6]=  {0xff,0xff,0xff,0xff,0xff,0xff};
+
+struct odr_frame_node *rreq_list_head;
+struct odr_frame_node *rreq_list_rear;
+struct hwa_info	*hw_head;
+
+
+void odr_init(){
+
+	hw_head = get_hw_addrs();
+}
+
+
 
 int create_pf_socket(){
 
-	return Socket(PF_PACKET,SOCK_RAW,htons(ODR_GRP_TYPE));
-
+	return socket(PF_PACKET,SOCK_RAW,htons(ODR_GRP_TYPE));
 }
 
 unsigned int getNumOfInfs(struct hwa_info *head){
 
 	unsigned int size;
 
-	struct hwa_info *temp = head;
+	struct hwa_info *temp;
+	temp = head;
 
 	while(temp!=NULL){
 		size++;
@@ -37,17 +47,14 @@ unsigned int getNumOfInfs(struct hwa_info *head){
  * Have written only for rreq.
  * Will see whether to name the method as rreq/ a generic method
  * for all the types of the packets.
- *
- * TODO:
- * 	Append the broadcast_id and hop_count in the rreq.
- * 	ideally good to have a structure for this.
  */
-void send_frame_rreq(int pf_sockfd,int recv_inf_index, int packet_type,
-				struct  reply_from_uds_client *reply){
+void send_frame_rreq(int pf_sockfd,int recv_inf_index,
+		struct odr_frame *frame,char *vm_name){
 
 	struct sockaddr_ll addr_ll;
 	struct hwa_info *hw_temp;
 	unsigned char dest_mac[6];
+	unsigned char src_mac[6];
 	int send_result = 0;
 
 	for(hw_temp = hw_head;
@@ -56,10 +63,11 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index, int packet_type,
 		if(hw_temp->if_index != recv_inf_index){
 
 			strcpy(dest_mac,BROADCAST_MAC_ADDRESS);
+			strcpy(src_mac,hw_temp->if_haddr);
 
 			bzero(&addr_ll,sizeof(addr_ll));
 
-			void* buffer = (void*)malloc(strlen(reply->canonical_ipAddress) + ETH_HDR_LEN + 1);
+			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
 
 			unsigned char* etherhead = buffer;
 
@@ -75,8 +83,16 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index, int packet_type,
 
 
 			/*set the frame header*/
+
+			if(DEBUG){
+				printf("src addr %x %d\n",hw_temp->if_haddr[0],hw_temp->if_index);
+				printf("frame_size :%lu\n",EHTR_FRAME_SIZE);
+			}
+
 			memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
-			memcpy((void*)(buffer+ETH_ALEN), (void*)hw_temp->if_haddr, ETH_ALEN);
+			memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
+
+			printf("eth src addr %x\n",src_mac[0]);
 			eh->h_proto = htons(ODR_GRP_TYPE);
 
 			memcpy(addr_ll.sll_addr,(void*)dest_mac, ETH_ALEN);
@@ -87,9 +103,13 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index, int packet_type,
 			addr_ll.sll_addr[6] = 0x00;
 			addr_ll.sll_addr[7] = 0x00;
 
-			strcpy(data,reply->canonical_ipAddress);
+			memcpy(data,frame,sizeof(struct odr_frame));
 
-			if(sendto(pf_sockfd,buffer,strlen(buffer),
+			// TODO : have to convert dest_mac into presentation format.
+			printf("ODR at node %s is sending frame rreq- src: %s dest: %s"
+					"from outgoing interface index :%d\n",vm_name,vm_name,dest_mac);
+
+			if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
 							(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
 				printf("Error in send to %s\n",strerror(errno));
 				exit(-1);
@@ -145,7 +165,7 @@ int* bindInterfaces(int *inf_sockid_map){
 		bzero(&addr_ll,sizeof(addr_ll));
 
 		addr_ll.sll_family = PF_PACKET;
-		memcpy(addr_ll.sll_addr,hw_temp->if_haddr);
+		memcpy(addr_ll.sll_addr,hw_temp->if_haddr,8);
 		addr_ll.sll_ifindex = hw_temp->if_index;
 		addr_ll.sll_protocol = htons(ODR_GRP_TYPE);
 
@@ -163,9 +183,83 @@ int* bindInterfaces(int *inf_sockid_map){
 
 
 bool is_route_exists(char *canonical_ipAddress){
-
 	return false;
 }
 
 
+void store_rreq_frame(struct odr_frame *frame)
+{
+	struct odr_frame_node *frame_node;
+	frame_node = (struct odr_frame_node*)malloc(sizeof(struct odr_frame_node));
+	frame_node->frame = *frame;
+	frame_node->next = NULL;
+
+	if(rreq_list_head == NULL)
+	{
+		rreq_list_head = frame_node;
+		rreq_list_rear = rreq_list_head;
+		return;
+	}
+
+	rreq_list_rear -> next = frame_node;
+	rreq_list_rear = frame_node;
+	return;
+}
+
+void remove_rreq_frame(struct odr_frame *frame)
+{
+	struct odr_frame_node *temp = rreq_list_head;
+
+	if(rreq_list_head == NULL)
+		return;
+
+	if(temp -> frame.hdr.broadcast_id == frame->hdr.broadcast_id &&
+			(strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_src_ipaddr) == 0))
+	{
+		rreq_list_head = rreq_list_head -> next;
+		free(temp);
+		return;
+	}
+
+	struct odr_frame_node *prev = temp;
+	temp = temp -> next;
+	while(temp != NULL)
+	{
+		if(temp -> frame.hdr.broadcast_id == frame->hdr.broadcast_id &&
+					(strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_src_ipaddr) == 0))
+		{
+			if(rreq_list_rear == temp)
+			{
+				rreq_list_rear = prev;
+			}
+			prev -> next = temp -> next;
+			free(temp);
+			return;
+		}
+		prev = temp;
+		temp = temp -> next;
+	}
+}
+
+int is_inefficient_rreq_exists(struct odr_frame *frame)
+{
+	struct odr_frame_node *temp = rreq_list_head;
+	while(temp != NULL)
+	{
+		if(!strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_src_ipaddr) &&
+				temp -> frame.hdr.broadcast_id == frame->hdr.broadcast_id)
+		{
+			printf("Source addr and broadcast_id matching\n");
+			if(temp -> frame.hdr.hop_count > frame->hdr.hop_count)
+			{
+				if("Existing rreq hop_count is greater than new rreq hop_count. So updating frame in list\n")
+				temp -> frame = *frame;
+				return INEFFICIENT_R_REQ_EXISTS;
+			}else{
+				return EFFICIENT_R_REQ_EXISTS;
+			}
+		}
+	}
+	return R_REQ_NOT_EXISTS;
+}
 

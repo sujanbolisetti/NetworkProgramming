@@ -2,12 +2,11 @@
 #include <sys/ioctl.h>          /* ioctls */
 //#include <net/if.h>             /* generic interface structures */
 
-#include "hw_addrs.h"
+//#include "hw_addrs.h"
 #include "usp.h"
 
 
-struct hwa_info *
-get_hw_addrs()
+struct hwa_info *get_hw_addrs()
 {
 	struct hwa_info	*hwa, *hwahead, **hwapnext;
 	int		sockfd, len, lastlen, alias, nInterfaces, i;
@@ -45,7 +44,7 @@ get_hw_addrs()
 	for(i = 0; i < nInterfaces; i++)  {
 		item = &ifr[i];
  		alias = 0; 
- 		if(strcmp(item->ifr_name,"lo") || strcmp(item->ifr_name,"eth0")){
+ 		if(!strcmp(item->ifr_name,"lo") || !strcmp(item->ifr_name,"eth0")){
 
  			if(DEBUG)
  				printf("Entered into lo | eth0 interface\n");

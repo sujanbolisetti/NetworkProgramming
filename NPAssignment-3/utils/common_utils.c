@@ -56,18 +56,18 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 	strcpy(msg_odr+length+1,temp_str);
 
 	printf("length %d\n",length);
-
 	printf("complete string %s\n",temp);
 
-	write(sockfd,temp,strlen(temp));
-
+	if(write(sockfd,temp,strlen(temp)) <  0){
+		printf("write failed with error :%s\n",strerror(errno));
+	}
 }
 
 struct reply_from_uds_client * msg_receive(int sockfd){
 
-	struct reply_from_uds_client *reply = (struct reply_from_ODR *)malloc(sizeof(struct reply_from_ODR));
+	struct reply_from_uds_client *reply = (struct reply_from_uds_client *)malloc(sizeof(struct reply_from_uds_client));
 	char* msg_odr = (char *)malloc(sizeof(char)*1024);
-	memset(reply, '\0', sizeof(struct reply_from_ODR));
+	memset(reply, '\0', sizeof(struct reply_from_uds_client));
 
 	//bzero(reply,);
 	if(read(sockfd,msg_odr,1024) > 0){
@@ -84,7 +84,9 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 			dollarCount++;
 			i++;
 		}else{
-			printf("character %c\n",msg_odr[i]);
+			if(DEBUG)
+				printf("character %c\n",msg_odr[i]);
+
 			tmp_str[k] = msg_odr[i];
 			i++;
 			k++;
@@ -96,7 +98,8 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 		case 1:
 			if(reply->canonical_ipAddress == NULL){
 				tmp_str[k] = '\0';
-				printf("ip-address %s\n",tmp_str);
+
+				//printf("ip-address %s\n",tmp_str);
 				reply->canonical_ipAddress = malloc(sizeof(char)*128);
 				strcpy(reply->canonical_ipAddress,tmp_str);
 				memset(tmp_str,'\0',sizeof(tmp_str));
@@ -109,14 +112,16 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 				reply->msg_received = malloc(sizeof(char)*1024);
 				strcpy(reply->msg_received,tmp_str);
 				memset(tmp_str,'\0',sizeof(tmp_str));
+				k=0;
 			}
 			break;
 		case 2:
-			if(reply->portNumber ==  NULL){
+			//if(reply->portNumber ==  NULL)
+			{
 				tmp_str[k] = '\0';
 				int portNumber = atoi(tmp_str);
-				printf("port number %d\n",portNumber);
-				reply->portNumber = &portNumber;
+				//printf("port number %d\n",portNumber);
+				reply->portNumber = portNumber;
 				memset(tmp_str,'\0',sizeof(tmp_str));
 				k=0;
 			}
@@ -125,7 +130,11 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 
 	}
 
-	printf("canonical ip-address : %s %d %s	\n",reply->canonical_ipAddress,*(reply->portNumber),reply->msg_received);
+	reply->flag = atoi(tmp_str);
+
+	if(!DEBUG)
+		printf("reply parameters : %s %d %s	%d\n",reply->canonical_ipAddress,(reply->portNumber),reply->msg_received,reply->flag);
+
 	return reply;
 }
 
@@ -150,6 +159,15 @@ Gethostbyname(char *my_name){
 	}
 }
 
+
+void convertToNetworkOrder(struct odr_hdr *hdr){
+
+	hdr->broadcast_id = htonl(hdr->broadcast_id);
+	hdr->hop_count = htons(hdr->hop_count);
+	hdr->pkt_type = htons(hdr->pkt_type);
+	hdr->force_route_dcvry = htons(hdr->force_route_dcvry);
+	hdr->rreply_sent = htons(hdr->rreply_sent);
+}
 
 
 
