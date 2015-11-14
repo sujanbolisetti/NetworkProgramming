@@ -89,16 +89,18 @@ int main(){
 			printf("%s received packet from other ODR\n",my_name);
 
 			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
-			int length = 0;
 			int addr_len = sizeof(addr_ll);
+			unsigned char src_mac_addr[6];
 
-			length = recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len);
-
-			if(length < 0){
-				printf("Error in recvfrom %s\n",strerror(errno));
+			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len) < 0){
+				printf("Error in recv_from :%s\n",strerror(errno));
+				exit(0);
 			}
 
+			memcpy((void *)src_mac_addr,(void *)buffer,ETH_ALEN);
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
+
+
 
 			if(DEBUG)
 				printf("ip-address %s\n",received_frame->hdr.cn_dsc_ipaddr);
@@ -107,32 +109,23 @@ int main(){
 			{
 				printf("Its my packet\n");
 				// TODO: send R_REPLY_SENT
-				build_rreply_frame(received_frame);
+				//build_rreply_frame(received_frame);
 				exit(0);
 			}
 			else
 			{
+				//TODO: have to write switch case to handle
+				// according to the type of the frame received.
+
 				received_frame->hdr.hop_count++;
 
-				int result = is_inefficient_rreq_exists(received_frame);
-
-				if(result == INEFFICIENT_R_REQ_EXISTS || result == R_REQ_NOT_EXISTS){
-
-					if(result == R_REQ_NOT_EXISTS){
-						store_rreq_frame(received_frame);
-					}
-					// TODO: populate R_REPLY_SENT flag
-
-					send_frame_rreq(pf_sockfd,addr_ll.sll_ifindex,received_frame);
-				}else{
-					printf("Not flooding rreq as efficient one's exists\n");
+				switch(received_frame->hdr.pkt_type){
+				case R_REQ:
+					process_received_rreq_frame(received_frame,src_mac_addr);
+				case R_REPLY:
+					process_received_rreply_frame(received_frame);
 				}
 			}
-
-
-			gethostname(my_name,sizeof(my_name));
-
-			printf("message received on %s\n",my_ip_address);
 
 		}
 	}

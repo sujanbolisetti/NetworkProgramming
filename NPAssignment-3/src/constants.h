@@ -38,11 +38,11 @@
 
 #define EHTR_FRAME_SIZE sizeof(struct odr_frame) + ETH_HDR_LEN
 
-#define INEFFICIENT_R_REQ_EXISTS 1
+#define INEFFICIENT_FRAME_EXISTS 1
 
-#define EFFICIENT_R_REQ_EXISTS 0
+#define EFFICIENT_FRAME_EXISTS 0
 
-#define R_REQ_NOT_EXISTS 2
+#define FRAME_NOT_EXISTS 2
 
 
 //#define VM1 "130.245.156.21"

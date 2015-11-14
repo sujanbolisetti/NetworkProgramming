@@ -33,8 +33,19 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 	}
 }
 
-bool entry_exists_in_rtable(){
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress){
 
+	struct route_entry *temp_rnode = rtable_head;
+
+	while(temp_rnode != NULL){
+
+		if(strcmp(temp_rnode->dest_canonical_ipAddress,dest_ipAddress)){
+			return temp_rnode;
+		}
+
+		temp_rnode = temp_rnode->next;
+	}
+	return NULL;
 }
 
 

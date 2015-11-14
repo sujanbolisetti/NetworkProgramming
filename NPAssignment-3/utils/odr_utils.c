@@ -13,6 +13,10 @@ char BROADCAST_MAC_ADDRESS[6]=  {0xff,0xff,0xff,0xff,0xff,0xff};
 
 struct odr_frame_node *rreq_list_head;
 struct odr_frame_node *rreq_list_rear;
+struct odr_frame_node *rreply_list_head;
+struct odr_frame_node *rreply_list_rear;
+
+
 struct hwa_info	*hw_head;
 
 
@@ -120,6 +124,24 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 }
 
 /**
+ *  RReply has to be forwarded until it reaches the src_ip address.
+ *  1.If the destination address in the rreply matches the vm's canonical IP Address
+ *    then we need to find the matching rreq and delete it and send the application
+ *    payload.
+ *  2. If the destination address doesn't match the ip address of the vm's then search
+ *     routing_entry in the routing table, if exists forward the frame to the out-going interface
+ *  3. Else create a rreq for the destination and then send the rreply for that destination.
+ */
+void process_received_rreply_frame(struct odr_frame received_frame,int pf_sockid,
+		int received_inf_ind,char *next_hop_address){
+
+
+
+
+}
+
+
+/**
  *  Idea :
  *  	To parse the incoming frame.
  *  	Options:
@@ -133,9 +155,38 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
  *
  *
  */
-void process_received_frame(){
+void process_received_rreq_frame(struct odr_frame received_frame,
+			int pf_sockid,int received_inf_ind,char *next_hop_address){
+
+	struct route_entry *rt;
+
+	int result = is_inefficient_frame_exists(received_frame);
+
+	/**
+	 *  We will forward the frame only in case if the rreq was new/
+	 *  its a better rreq than the currently saved rreq for the brodcast-id
+	 *  and sender ip address.
+	 */
+	if(result == INEFFICIENT_FRAME_EXISTS || result == FRAME_NOT_EXISTS){
+
+		if(result ==FRAME_NOT_EXISTS){
+			store_rreq_frame(received_frame,rreq_list_head,rreq_list_rear);
+		}
+
+		// TODO: populate R_REPLY_SENT flag
+		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr)) != NULL){
+			// have to sent a R_Reply
+		}else{
+			// added the entry in the routing table.
+			add_entry_in_rtable(received_frame->hdr.cn_src_ipaddr,next_hop_address,received_frame->hdr.hop_count,received_inf_ind);
+			send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
+		}
 
 
+
+	}else{
+		printf("Not flooding rreq as efficient one's exists\n");
+	}
 
 }
 
@@ -187,22 +238,22 @@ bool is_route_exists(char *canonical_ipAddress){
 }
 
 
-void store_rreq_frame(struct odr_frame *frame)
+void store_frame(struct odr_frame *frame,struct odr_frame_node *head, struct odr_frame_node *tail)
 {
 	struct odr_frame_node *frame_node;
 	frame_node = (struct odr_frame_node*)malloc(sizeof(struct odr_frame_node));
 	frame_node->frame = *frame;
 	frame_node->next = NULL;
 
-	if(rreq_list_head == NULL)
+	if(head == NULL)
 	{
-		rreq_list_head = frame_node;
-		rreq_list_rear = rreq_list_head;
+		head = frame_node;
+		head = rreq_list_head;
 		return;
 	}
 
-	rreq_list_rear -> next = frame_node;
-	rreq_list_rear = frame_node;
+	tail -> next = frame_node;
+	tail = frame_node;
 	return;
 }
 
@@ -241,9 +292,9 @@ void remove_rreq_frame(struct odr_frame *frame)
 	}
 }
 
-int is_inefficient_rreq_exists(struct odr_frame *frame)
+int is_inefficient_frame_exists(struct odr_frame *frame,struct odr_frame_node *head)
 {
-	struct odr_frame_node *temp = rreq_list_head;
+	struct odr_frame_node *temp = head;
 	while(temp != NULL)
 	{
 		if(!strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_src_ipaddr) &&
@@ -254,12 +305,12 @@ int is_inefficient_rreq_exists(struct odr_frame *frame)
 			{
 				if("Existing rreq hop_count is greater than new rreq hop_count. So updating frame in list\n")
 				temp -> frame = *frame;
-				return INEFFICIENT_R_REQ_EXISTS;
+				return INEFFICIENT_FRAME_EXISTS;
 			}else{
-				return EFFICIENT_R_REQ_EXISTS;
+				return EFFICIENT_FRAME_EXISTS;
 			}
 		}
 	}
-	return R_REQ_NOT_EXISTS;
+	return FRAME_NOT_EXISTS;
 }
 
