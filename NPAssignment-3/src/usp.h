@@ -143,9 +143,31 @@ struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type,
 
 int is_inefficient_rreq_exists(struct odr_frame *frame);
 
-void remove_rreq_frame(struct odr_frame *frame);
+bool remove_rreq_frame(struct odr_frame *frame);
 
 void store_rreq_frame(struct odr_frame *frame);
 
+void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr_frame *received_frame,
+		char *src_mac_addr, char* dst_mac_addr, bool is_belongs_to_me);
 
+void send_frame_rreply(int pf_sockid, struct odr_frame *frame, int hop_count,char *src_mac_addr, bool is_belongs_to_me);
+
+void send_frame_rreq(int pf_sockfd,int recv_inf_index,
+		struct odr_frame *frame);
+
+void build_eth_frame(void *buffer,char *dest_mac,
+			char *src_mac,int inf_index,
+			struct sockaddr_ll *addr_ll,struct odr_frame *frame, int eth_pkt_type);
+
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
+
+void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
+
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress);
+
+void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count);
+
+void convertToNetworkOrder(struct odr_hdr *hdr);
+
+char* Gethostname();
 #endif /* USP_H_ */

@@ -37,6 +37,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress){
 
 	struct route_entry *temp_rnode = rtable_head;
 
+	//TODO Have to check stale entries.
 	while(temp_rnode != NULL){
 
 		if(strcmp(temp_rnode->dest_canonical_ipAddress,dest_ipAddress)){
@@ -48,7 +49,29 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress){
 	return NULL;
 }
 
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index){
+	struct route_entry *rnode_entry = get_rentry_in_rtable(dest_ipaddress);
 
+	if(rnode_entry != NULL)
+	{
+		if(hop_count < rnode_entry->hop_count)
+		{
+			rnode_entry->hop_count = hop_count;
+			rnode_entry->outg_inf_index = outg_inf_index;
+			strcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr);
+			return true;
+		}
+		else
+		{
+			return false;
+		}
+	}
+	else
+	{
+		add_entry_in_rtable(dest_ipaddress, next_hp_mac_addr, hop_count, outg_inf_index);
+		return true;
+	}
+}
 
 
 

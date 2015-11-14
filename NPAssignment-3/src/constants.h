@@ -44,26 +44,6 @@
 
 #define FRAME_NOT_EXISTS 2
 
-
-//#define VM1 "130.245.156.21"
-//
-//#define VM2 "130.245.156.22"
-//
-//#define VM3 "130.245.156.23"
-//
-//#define VM4 "130.245.156.24"
-//
-//#define VM5 "130.245.156.25"
-//
-//#define VM6 "130.245.156.26"
-//
-//#define VM7 "130.245.156.27"
-//
-//#define VM8 "130.245.156.28"
-//
-//#define VM9 "130.245.156.29"
-//
-//#define VM10 "130.245.156.20"
-
+#define INVALID_HOP_COUNT -1
 
 #endif /* CONSTANTS_H_ */

@@ -91,6 +91,7 @@ int main(){
 			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
 			int addr_len = sizeof(addr_ll);
 			unsigned char src_mac_addr[6];
+			unsigned char dest_mac_addr[6];
 
 			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len) < 0){
 				printf("Error in recv_from :%s\n",strerror(errno));
@@ -98,8 +99,9 @@ int main(){
 			}
 
 			memcpy((void *)src_mac_addr,(void *)buffer,ETH_ALEN);
-			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
+			memcpy((void *)dest_mac_addr,(void *)buffer+ETH_ALEN,ETH_ALEN);
 
+			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
 
 			if(DEBUG)
@@ -107,26 +109,41 @@ int main(){
 
 			if(is_frame_belongs_to_me(received_frame->hdr.cn_dsc_ipaddr, my_ip_address))
 			{
-				printf("Its my packet\n");
+				printf("%s has received a packet with type %d which belongs it\n",my_name,received_frame->hdr.pkt_type);
 				// TODO: send R_REPLY_SENT
+				// have to send application payload/r_reply based on the
+				// type of the frame received.
 				//build_rreply_frame(received_frame);
-				exit(0);
-			}
-			else
-			{
-				//TODO: have to write switch case to handle
-				// according to the type of the frame received.
 
 				received_frame->hdr.hop_count++;
 
 				switch(received_frame->hdr.pkt_type){
-				case R_REQ:
-					process_received_rreq_frame(received_frame,src_mac_addr);
-				case R_REPLY:
-					process_received_rreply_frame(received_frame);
-				}
-			}
 
+					case R_REQ:
+						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
+																				received_frame,src_mac_addr,dest_mac_addr, true);
+						break;
+					case R_REPLY:
+						printf("TODO: have to sent the data-payload\n");
+						break;
+					}
+			}
+			else
+			{
+				received_frame->hdr.hop_count++;
+				switch(received_frame->hdr.pkt_type){
+
+				case R_REQ:
+					process_received_rreq_frame(pf_sockfd,addr_ll.sll_ifindex,
+															received_frame,src_mac_addr,dest_mac_addr);
+					break;
+				case R_REPLY:
+					process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
+															received_frame,src_mac_addr,dest_mac_addr,false);
+					break;
+				}
+
+			}
 		}
 	}
 }

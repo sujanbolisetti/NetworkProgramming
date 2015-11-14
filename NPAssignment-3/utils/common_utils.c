@@ -9,6 +9,9 @@
 
 #define concat(a,b) {a##b}
 
+char *my_name;
+bool isHostNameFilled = false;
+
 
 void
 msg_send(int sockfd, char* destIpAddress, int destPortNumber,
@@ -138,6 +141,16 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 	return reply;
 }
 
+
+char* Gethostname(){
+
+	if(!isHostNameFilled){
+		my_name = (char *)malloc(20*sizeof(char));
+		gethostname(my_name,sizeof(my_name));
+		isHostNameFilled = true;
+	}
+	return my_name;
+}
 
 char*
 Gethostbyname(char *my_name){
