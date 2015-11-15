@@ -20,6 +20,7 @@ int main(){
 	int broadcast_id=0;
 	struct odr_frame frame;
 	char my_ip_address[20];
+	char inf_mac_addr_map[10][20];
 
 	gethostname(my_name,sizeof(my_name));
 
@@ -49,7 +50,7 @@ int main(){
 
 	maxfd = max(sockfd,pf_sockfd)+1;
 
-	odr_init();
+	odr_init(inf_mac_addr_map);
 
 	for(;;){
 
@@ -90,19 +91,30 @@ int main(){
 
 			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
 			int addr_len = sizeof(addr_ll);
-			unsigned char src_mac_addr[6];
-			unsigned char dest_mac_addr[6];
+			unsigned char src_mac_addr[8];
+			unsigned char dest_mac_addr[8];
 
 			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len) < 0){
 				printf("Error in recv_from :%s\n",strerror(errno));
 				exit(0);
 			}
 
-			memcpy((void *)src_mac_addr,(void *)buffer,ETH_ALEN);
-			memcpy((void *)dest_mac_addr,(void *)buffer+ETH_ALEN,ETH_ALEN);
+			memcpy((void *)dest_mac_addr,(void *)buffer,ETH_ALEN);
+			memcpy((void *)src_mac_addr,(void *)(buffer+ETH_ALEN),ETH_ALEN);
 
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
+			printHWADDR(dest_mac_addr);
+			printHWADDR(src_mac_addr);
+
+			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
+			{
+				memcpy((void *)dest_mac_addr,(void *)inf_mac_addr_map[addr_ll.sll_ifindex],ETH_ALEN);
+				printf("After updating dest addr for broadcast packet");
+				printHWADDR(dest_mac_addr);
+			}
+
+			printf("packet type from sockaddr_ll %d\n",addr_ll.sll_pkttype);
 
 			if(DEBUG)
 				printf("ip-address %s\n",received_frame->hdr.cn_dsc_ipaddr);
@@ -120,6 +132,8 @@ int main(){
 				switch(received_frame->hdr.pkt_type){
 
 					case R_REQ:
+						if(DEBUG)
+							printf("Recieved my R_REQ destined to me\n");
 						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
 																				received_frame,src_mac_addr,dest_mac_addr, true);
 						break;

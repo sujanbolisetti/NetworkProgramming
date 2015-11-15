@@ -21,9 +21,9 @@ void *buffer;
 struct hwa_info	*hw_head;
 
 
-void odr_init(){
-
+void odr_init(char inf_mac_addr_map[10][20]){
 	hw_head = get_hw_addrs();
+	fill_inf_mac_addr_map(hw_head, inf_mac_addr_map);
 	buffer = (void*)malloc(EHTR_FRAME_SIZE);
 }
 
@@ -148,11 +148,11 @@ void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr
 	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,received_inf_ind);
 	if(remove_rreq_frame(received_frame) || is_belongs_to_me)
 	{
-		send_frame_rreply(pf_sockid,received_frame,INVALID_HOP_COUNT,dst_mac_addr,is_belongs_to_me);
+		send_frame_rreply(pf_sockid, received_frame,INVALID_HOP_COUNT,dst_mac_addr,is_belongs_to_me);
 	}
 	else
 	{
-		printf("Discarding R_RPLY as corresponding R_REQ doesn't exist");
+		printf("Discarding R_RPLY as corresponding R_REQ doesn't exist\n");
 	}
 }
 
@@ -324,7 +324,7 @@ bool remove_rreq_frame(struct odr_frame *frame)
 		return false;
 
 	if(temp -> frame.hdr.broadcast_id == frame->hdr.broadcast_id &&
-			(strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_src_ipaddr) == 0))
+			(strcmp(temp -> frame.hdr.cn_src_ipaddr, frame->hdr.cn_dsc_ipaddr) == 0))
 	{
 		rreq_list_head = rreq_list_head -> next;
 		free(temp);
@@ -387,8 +387,12 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 		strcpy(dst_addr,frame->hdr.cn_src_ipaddr);
 
 		if(is_belongs_to_me){
+			if(DEBUG)
+				printf("Updating ZERO hop count\n");
 			build_rreply_odr_frame(frame, ZERO_HOP_COUNT);
 		}else{
+			if(DEBUG)
+				printf("Updating received hop count %d\n", hop_count);
 			build_rreply_odr_frame(frame, hop_count);
 		}
 	}
@@ -397,12 +401,20 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 		strcpy(dst_addr,frame->hdr.cn_dsc_ipaddr);
 	}
 
+	if(DEBUG)
+		printf("Dest address %s\n",dst_addr);
 	if((rt = get_rentry_in_rtable(dst_addr)) != NULL){
+
+		if(DEBUG)
+			printf("route entry exists\n");
 
 		memset(buffer,'\0',sizeof(buffer));
 		build_eth_frame(buffer,rt->next_hop_mac_address,
 				src_mac_addr,rt->outg_inf_index,
 						&addr_ll,frame, PACKET_OTHERHOST);
+
+		if(DEBUG)
+			printf("built frame\n");
 
 		if(sendto(pf_sockid,buffer,EHTR_FRAME_SIZE,0,
 											(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
@@ -413,5 +425,6 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 	else
 	{
 		// Generate R_REQ and then send R_RPLY
+		printf("Wierd no entry exists\n");
 	}
 }

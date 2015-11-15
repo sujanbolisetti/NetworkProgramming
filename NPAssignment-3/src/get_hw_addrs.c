@@ -43,7 +43,7 @@ struct hwa_info *get_hw_addrs()
 	nInterfaces = ifc.ifc_len / sizeof(struct ifreq);
 	for(i = 0; i < nInterfaces; i++)  {
 		item = &ifr[i];
- 		alias = 0; 
+ 		alias = 0;
  		if(!strcmp(item->ifr_name,"lo") || !strcmp(item->ifr_name,"eth0")){
 
  			if(DEBUG)

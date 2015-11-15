@@ -172,6 +172,23 @@ Gethostbyname(char *my_name){
 	}
 }
 
+void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20])
+{
+	struct hwa_info	*temp = hw_head;
+	char   *ptr;
+	int i =0;
+	while(temp != NULL)
+	{
+		if(DEBUG)
+		{
+			printf("Interface index %d\t",temp->if_index);
+			printHWADDR(temp->if_haddr);
+
+		}
+		strcpy(inf_mac_addr_map[temp->if_index],temp->if_haddr);
+		temp = temp -> hwa_next;
+	}
+}
 
 void convertToNetworkOrder(struct odr_hdr *hdr){
 
@@ -182,6 +199,18 @@ void convertToNetworkOrder(struct odr_hdr *hdr){
 	hdr->rreply_sent = htons(hdr->rreply_sent);
 }
 
+
+void printHWADDR(char *hw_addr){
+
+	printf("         HW addr = ");
+	char *ptr = hw_addr;
+	int i = IF_HADDR;
+	do {
+		printf("%.2x%s", *ptr++ & 0xff, (i == 1) ? " " : ":");
+	} while (--i > 0);
+
+	printf("\n");
+}
 
 
 //char*

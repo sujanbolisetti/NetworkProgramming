@@ -77,7 +77,7 @@ struct reply_from_uds_client{
 struct route_entry{
 
 	char dest_canonical_ipAddress[20];
-	char next_hop_mac_address[ETH_ALEN];
+	char next_hop_mac_address[6];
 	int outg_inf_index;
 	int hop_count;
 	int time_stamp;
@@ -169,5 +169,11 @@ void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count);
 
 void convertToNetworkOrder(struct odr_hdr *hdr);
 
+void printRoutingTable(struct route_entry* head);
+
 char* Gethostname();
+
+void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20]);
+
+void printHWADDR(char* src_mac_addr);
 #endif /* USP_H_ */
