@@ -46,4 +46,12 @@
 
 #define INVALID_HOP_COUNT -1
 
+#define MSG_LEN 1024
+
+#define NUM_PORT_ENTRIES 200
+
+#define SERVER_PORT 0
+
+#define ODR_PORT 1
+
 #endif /* CONSTANTS_H_ */

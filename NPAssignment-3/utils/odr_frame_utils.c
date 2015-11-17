@@ -36,7 +36,8 @@ struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type,
 		struct odr_frame frame;
 
 		frame.hdr = build_odr_hdr(src,dst,hop_count,pkt_type, broadcast_id, frc_dsc,rreply_sent);
-		if(pkt_type == PAY_LOAD){
+
+		if(pkt_type == PAY_LOAD && pay_load != NULL){
 			strcpy(frame.payload,pay_load);
 		}
 

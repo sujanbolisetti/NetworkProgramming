@@ -58,6 +58,7 @@
 
 #define SA struct sockaddr
 
+
 #define	min(a,b)	((a) < (b) ? (a) : (b))
 #define	max(a,b)	((a) > (b) ? (a) : (b))
 
@@ -67,7 +68,13 @@ struct vm_info{
 	struct vm_info *next;
 };
 
-struct reply_from_uds_client{
+struct port_entry{
+	int port_num;
+	char path_name[108];
+	int time_stamp;
+};
+
+struct reply_from_uds{
 	char* msg_received;
 	char* canonical_ipAddress;
 	int portNumber;
@@ -93,6 +100,7 @@ struct odr_hdr{
 	uint16_t pkt_type;
 	uint16_t force_route_dcvry;
 	int broadcast_id;
+	int rreq_id;
 	uint16_t rreply_sent;
 };
 
@@ -112,13 +120,14 @@ struct odr_frame_node
 	struct odr_frame_node *next;
 };
 
-
 void odr_init();
 
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag);
 
-struct reply_from_uds_client * msg_receive(int sockfd);
+struct reply_from_uds * msg_receive(int sockfd);
+
+void build_port_entries();
 
 char *
 get_vm_ipaddress(char *vm_name,struct vm_info *head);
@@ -135,11 +144,10 @@ get_vm_name(char *vm_ipAddress,struct vm_info *head);
 char*
 Gethostbyname(char *my_name);
 
+int add_port_entry(char* path_name);
+
 char *
 Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
-
-struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
-			int frc_dsc,int rreply_sent,char *pay_load);
 
 int is_inefficient_rreq_exists(struct odr_frame *frame);
 
@@ -154,6 +162,12 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame, int hop_count,cha
 
 void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 		struct odr_frame *frame);
+
+struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
+			int frc_dsc,int rreply_sent,char *pay_load);
+
+struct odr_frame build_payload_frame(char *my_ip_address, char *dest_ip_addr,
+		char *payload,int force_dsc);
 
 void build_eth_frame(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
@@ -176,4 +190,20 @@ char* Gethostname();
 void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20]);
 
 void printHWADDR(char* src_mac_addr);
+
+bool remove_data_payload(struct odr_frame *frame);
+
+struct odr_frame * get_next_send_packet(struct odr_frame *frame);
+
+void send_frame_for_rreply(int pf_sockfd,struct odr_frame *send_frame,
+			char *src_mac_addr,char *dst_mac_addr,int inf_index);
+
+void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
+			char *src_mac_addr,char *nxt_hop_addr,int outg_inf_index);
+
+void send_payload(int pf_sockfd, struct route_entry* rt,
+							char* my_ip_addr, char *src_mac_addr, char* payload,int force_dsc);
+
+void build_port_entries();
+
 #endif /* USP_H_ */

@@ -63,7 +63,7 @@ int main(){
 
 	printf("Primary IP_Address of the node : %s\n",ipAddress);
 
-//	for(;;){
+	for(;;){
 
 		printf("Enter the server node name (vm1....vm10)\n");
 
@@ -75,9 +75,9 @@ int main(){
 
 		printf("client node at %s sending the request to server at %s\n",my_name,server_vm_name);
 
-		msg_send(sockfd,Gethostbyname(server_vm_name),4234,"Get the current time",0);
+		msg_send(sockfd,Gethostbyname(server_vm_name),4234,"",0);
 
-	//}
+	}
 
 
 	// cleaning the file_name created

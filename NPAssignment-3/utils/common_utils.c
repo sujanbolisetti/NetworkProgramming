@@ -12,6 +12,10 @@
 char *my_name;
 bool isHostNameFilled = false;
 
+struct port_entry port_entries[NUM_PORT_ENTRIES];
+
+int port_num = 2;
+
 
 void
 msg_send(int sockfd, char* destIpAddress, int destPortNumber,
@@ -46,7 +50,11 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 
 	printf("%s\n",message);
 
-	length+=strlen(message);
+	if(strlen(message)){
+		length+=strlen(message);
+	}else{
+		length+=1;
+	}
 
 	msg_odr[length] = '$';
 
@@ -66,16 +74,27 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 	}
 }
 
-struct reply_from_uds_client * msg_receive(int sockfd){
 
-	struct reply_from_uds_client *reply = (struct reply_from_uds_client *)malloc(sizeof(struct reply_from_uds_client));
+struct reply_from_uds * msg_receive(int sockfd){
+
+	struct reply_from_uds *reply = (struct reply_from_uds *)malloc(sizeof(struct reply_from_uds));
 	char* msg_odr = (char *)malloc(sizeof(char)*1024);
-	memset(reply, '\0', sizeof(struct reply_from_uds_client));
+	memset(reply, '\0', sizeof(struct reply_from_uds));
+	struct sockaddr_un peerAddress;
+	bzero(&peerAddress,sizeof(peerAddress));
+	int port_number;
+	int len = sizeof(struct sockaddr_un);
 
 	//bzero(reply,);
-	if(read(sockfd,msg_odr,1024) > 0){
+	if(recvfrom(sockfd, msg_odr, MSG_LEN, 0, (SA*)&peerAddress, &len) > 0){
 		printf("messaged received %s\n",msg_odr);
 	}
+
+
+	printf("path_name of the client %s\n",peerAddress.sun_path);
+
+	port_number = add_port_entry(peerAddress.sun_path);
+
 
 	int length = strlen(msg_odr);
 	int i=0,k=0,dollarCount = 0,start_index=0;
@@ -87,8 +106,8 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 			dollarCount++;
 			i++;
 		}else{
-			if(DEBUG)
-				printf("character %c\n",msg_odr[i]);
+//			if(DEBUG)
+				//printf("character %c\n",msg_odr[i]);
 
 			tmp_str[k] = msg_odr[i];
 			i++;
@@ -113,7 +132,19 @@ struct reply_from_uds_client * msg_receive(int sockfd){
 			if(reply->msg_received ==  NULL){
 				tmp_str[k] = '\0';
 				reply->msg_received = malloc(sizeof(char)*1024);
-				strcpy(reply->msg_received,tmp_str);
+
+				if(!tmp_str[0]){
+
+					if(DEBUG)
+						printf("Entered into populating the portNumber in the msg field\n");
+
+					char port_str[10];
+					sprintf(port_str,"%d",port_number);
+					strcpy(reply->msg_received,port_str);
+				}
+				else{
+					strcpy(reply->msg_received,tmp_str);
+				}
 				memset(tmp_str,'\0',sizeof(tmp_str));
 				k=0;
 			}
@@ -199,10 +230,19 @@ void convertToNetworkOrder(struct odr_hdr *hdr){
 	hdr->rreply_sent = htons(hdr->rreply_sent);
 }
 
+void convertToHostOrder(struct odr_hdr *hdr){
+
+	hdr->broadcast_id = ntohl(hdr->broadcast_id);
+	hdr->hop_count = ntohs(hdr->hop_count);
+	hdr->pkt_type = ntohs(hdr->pkt_type);
+	hdr->force_route_dcvry = ntohs(hdr->force_route_dcvry);
+	hdr->rreply_sent = ntohs(hdr->rreply_sent);
+}
+
 
 void printHWADDR(char *hw_addr){
 
-	printf("         HW addr = ");
+	printf(" HW addr = ");
 	char *ptr = hw_addr;
 	int i = IF_HADDR;
 	do {
@@ -212,97 +252,40 @@ void printHWADDR(char *hw_addr){
 	printf("\n");
 }
 
+int add_port_entry(char* path_name)
+{
 
-//char*
-//get_vm_name(char *vm_ipAddress,struct vm_info *head){
-//
-//	struct vm_info *temp = head;
-//
-//	while(temp!=NULL){
-//
-//		if(!strcmp(temp->vm_ipadress,vm_ipAddress)){
-//
-//			return temp->vm_name;
-//		}
-//		temp = temp->next;
-//	}
-//
-//	return NULL;
-//
-//}
-//
-//char *
-//get_vm_ipaddress(char *vm_name,struct vm_info *head){
-//
-//	struct vm_info *temp = head;
-//
-//	while(temp!=NULL){
-//
-//		printf("vm-name :%s\n",temp->vm_name);
-//		if(!strcmp(temp->vm_name,vm_name)){
-//
-//			return temp->vm_ipadress;
-//		}
-//		temp = temp->next;
-//	}
-//
-//	return NULL;
-//}
-//
-//void
-//vm_init(){
-//
-//  int i=0;
-//
-//  for(i=0;i<NUM_OF_VMS;i++){
-//	sprintf(vm_names[i],"vm%d",i+1);
-//  }
-//
-//  strcpy(vm_names[10],"sujan-VirtualBox");
-//
-//  strcpy(vm_ipAddresses[0],"130.245.156.21");
-//  strcpy(vm_ipAddresses[1],"130.245.156.22");
-//  strcpy(vm_ipAddresses[2],"130.245.156.23");
-//  strcpy(vm_ipAddresses[3],"130.245.156.24");
-//  strcpy(vm_ipAddresses[4],"130.245.156.25");
-//  strcpy(vm_ipAddresses[5],"130.245.156.26");
-//  strcpy(vm_ipAddresses[6],"130.245.156.27");
-//  strcpy(vm_ipAddresses[7],"130.245.156.28");
-//  strcpy(vm_ipAddresses[8],"130.245.156.29");
-//  strcpy(vm_ipAddresses[9],"130.245.156.20");
-//  strcpy(vm_ipAddresses[10],"127.0.0.1");
-//}
-//
-//
-//struct vm_info *
-//populate_vminfo_structs(){
-//
-//	vm_init();
-//
-//	struct vm_info *head=NULL, *tmp=NULL;
-//
-//	int i=0;
-//
-//	for(i=0;i<=NUM_OF_VMS;i++){
-//
-//		struct vm_info *new_vm = (struct vm_info *)malloc(sizeof(struct vm_info));
-//
-//		new_vm->vm_name = vm_names[i];
-//		new_vm->vm_ipadress = vm_ipAddresses[i];
-//
-//		if(head== NULL){
-//			head = new_vm;
-//			tmp = head;
-//		}else{
-//			tmp->next = new_vm;
-//			tmp=new_vm;
-//		}
-//	}
-//
-//	tmp->next = NULL;
-//
-//	return head;
-//}
+	int i = 0;
+	// Checking the path_name is present or not.
+	for(i=0;i < NUM_PORT_ENTRIES;i++){
 
+		if(!strcmp(path_name,port_entries[i].path_name)){
+			return i;
+		}
+	}
+
+	struct port_entry port_entr;
+
+	port_num++;
+	port_entr.port_num = port_num;
+	strcpy(port_entr.path_name,path_name);
+	// have to insert a time stamp.
+	return port_num;
+}
+
+void build_port_entries()
+{
+	struct port_entry port_entr;
+
+	port_entr.port_num = 0;
+	strcpy(port_entr.path_name, SERVER_WELL_KNOWN_PATH_NAME);
+	port_entries[SERVER_PORT] = port_entr;
+
+	bzero(&port_entr, sizeof(port_entr));
+
+	port_entr.port_num = 1;
+	strcpy(port_entr.path_name, ODR_PATH_NAME);
+	port_entries[ODR_PORT] = port_entr;
+}
 
 

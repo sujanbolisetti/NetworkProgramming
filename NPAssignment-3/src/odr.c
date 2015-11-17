@@ -7,6 +7,7 @@
 
 #include "usp.h"
 
+
 int main(){
 
 	int sockfd,pf_sockfd,maxfd;
@@ -18,9 +19,14 @@ int main(){
 	char my_name[128];
 	unsigned int interface_index;
 	int broadcast_id=0;
+	/*
+	 *  Used to retrieve the saved packet
+	 */
+	int r_req_id = 0;
 	struct odr_frame frame;
 	char my_ip_address[20];
 	char inf_mac_addr_map[10][20];
+	struct route_entry *rt;
 
 	gethostname(my_name,sizeof(my_name));
 
@@ -65,10 +71,15 @@ int main(){
 
 		if(FD_ISSET(sockfd,&rset)){
 
-			struct reply_from_uds_client *reply = msg_receive(sockfd);
+			struct reply_from_uds *reply = msg_receive(sockfd);
+
 
 			// have to exclude this even when force_route_discovery.
-			if(is_route_exists(reply->canonical_ipAddress)){
+			// have to implement retransmission for r_req
+			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress)) != NULL && !reply->flag){
+
+				send_payload(pf_sockfd,rt,my_ip_address, inf_mac_addr_map[rt->outg_inf_index],
+							reply->msg_received,reply->flag);
 
 			}else{
 
@@ -78,8 +89,22 @@ int main(){
 				 *  3. Fill in the routing table and send the payload.
 				 */
 
+				struct odr_frame payload_frame;
+				payload_frame = build_payload_frame(my_ip_address,reply->canonical_ipAddress,
+											reply->msg_received,reply->flag);
+
+				payload_frame.hdr.rreq_id = r_req_id++;
+
+				if(DEBUG){
+					printf("broad_cast id %d  r_req id %d\n",r_req_id-1,broadcast_id);
+				}
+
+				store_next_to_send_frame(&payload_frame);
+
 				frame = build_odr_frame(my_ip_address,reply->canonical_ipAddress,
 						ZERO_HOP_COUNT,R_REQ,broadcast_id++,reply->flag,R_REPLY_NOT_SENT,NULL);
+
+				frame.hdr.rreq_id = payload_frame.hdr.rreq_id;
 
 				send_frame_rreq(pf_sockfd,-1,&frame);
 			}
@@ -91,8 +116,9 @@ int main(){
 
 			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
 			int addr_len = sizeof(addr_ll);
-			unsigned char src_mac_addr[8];
-			unsigned char dest_mac_addr[8];
+			unsigned char src_mac_addr[6];
+			unsigned char dest_mac_addr[6];
+
 
 			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len) < 0){
 				printf("Error in recv_from :%s\n",strerror(errno));
@@ -129,6 +155,8 @@ int main(){
 
 				received_frame->hdr.hop_count++;
 
+				struct odr_frame *frame_to_send;
+
 				switch(received_frame->hdr.pkt_type){
 
 					case R_REQ:
@@ -138,8 +166,20 @@ int main(){
 																				received_frame,src_mac_addr,dest_mac_addr, true);
 						break;
 					case R_REPLY:
-						printf("TODO: have to sent the data-payload\n");
+						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+						frame_to_send =  get_next_send_packet(received_frame);
+						send_frame_for_rreply(pf_sockfd,frame_to_send,src_mac_addr,dest_mac_addr,addr_ll.sll_ifindex);
+						remove_data_payload(received_frame);
 						break;
+
+					case PAY_LOAD:
+						// have to send the packet to the Unix domain socket - client
+					    // the port/path name of the client, you need to get from the mapping
+						// stored.
+						printf("payload received :%s\n",my_name);
+
+						break;
+
 					}
 			}
 			else
@@ -156,7 +196,6 @@ int main(){
 															received_frame,src_mac_addr,dest_mac_addr,false);
 					break;
 				}
-
 			}
 		}
 	}
@@ -167,5 +206,8 @@ int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)
 	return !strcmp(dest_ip_addr, my_ip_addr);
 }
 
+/**
+ *  This will insert only if the path name doesn't exist.
+ */
 
 
