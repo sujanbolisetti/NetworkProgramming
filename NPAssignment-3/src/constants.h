@@ -36,6 +36,8 @@
 
 #define R_REPLY_SENT 1
 
+#define MAX_INTERFACES 10
+
 #define EHTR_FRAME_SIZE sizeof(struct odr_frame) + ETH_HDR_LEN
 
 #define INEFFICIENT_FRAME_EXISTS 1

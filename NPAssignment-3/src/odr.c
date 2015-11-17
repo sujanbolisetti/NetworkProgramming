@@ -7,6 +7,7 @@
 
 #include "usp.h"
 
+char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN];
 
 int main(){
 
@@ -25,7 +26,6 @@ int main(){
 	int r_req_id = 0;
 	struct odr_frame frame;
 	char my_ip_address[20];
-	char inf_mac_addr_map[10][20];
 	struct route_entry *rt;
 
 	gethostname(my_name,sizeof(my_name));
@@ -176,7 +176,7 @@ int main(){
 					case R_REPLY:
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 						frame_to_send =  get_next_send_packet(received_frame);
-						send_frame_for_rreply(pf_sockfd,frame_to_send,dest_mac_addr,src_mac_addr,addr_ll.sll_ifindex);
+						send_frame_for_rreply(pf_sockfd,frame_to_send,dest_mac_addr,addr_ll.sll_ifindex);
 						remove_data_payload(received_frame);
 						break;
 
@@ -212,5 +212,17 @@ int main(){
 int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)
 {
 	return !strcmp(dest_ip_addr, my_ip_addr);
+}
+
+char* get_inf_mac_addr(int inf_index)
+{
+	if(inf_index < MAX_INTERFACES)
+		return inf_mac_addr_map[inf_index];
+	else
+	{
+		if(DEBUG)
+			printf("inf_index out of limit\n");
+		return NULL;
+	}
 }
 

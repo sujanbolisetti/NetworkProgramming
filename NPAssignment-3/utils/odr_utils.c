@@ -110,7 +110,7 @@ void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr
 	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,received_inf_ind);
 	if(remove_rreq_frame(received_frame) || is_belongs_to_me)
 	{
-		send_frame_rreply(pf_sockid, received_frame,INVALID_HOP_COUNT,dst_mac_addr,is_belongs_to_me);
+		send_frame_rreply(pf_sockid, received_frame,INVALID_HOP_COUNT,is_belongs_to_me);
 	}
 	else
 	{
@@ -153,7 +153,7 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
 
 		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr)) != NULL){
-			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,dst_mac_addr,false);
+			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
 			if(update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count, received_inf_ind)){
 				org_received_frame.hdr.rreply_sent = 1;
 				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
@@ -314,8 +314,10 @@ int is_inefficient_frame_exists(struct odr_frame *frame)
 	return FRAME_NOT_EXISTS;
 }
 
-void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char *src_mac_addr, bool is_belongs_to_me)
+void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
+			int hop_count,bool is_belongs_to_me)
 {
+
 	struct route_entry *rt;
 	struct sockaddr_ll addr_ll;
 
@@ -344,6 +346,13 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 		printf("Dest address %s\n",dst_addr);
 	if((rt = get_rentry_in_rtable(dst_addr)) != NULL){
 
+		char src_mac_addr[ETH_ALEN];
+
+		memcpy(src_mac_addr,get_inf_mac_addr(rt->outg_inf_index),ETH_ALEN);
+
+		printf("sending src_mac_addr in rreply\n");
+		printHWADDR(src_mac_addr);
+
 		if(DEBUG)
 			printf("route entry exists\n");
 
@@ -354,12 +363,6 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 
 		if(DEBUG)
 			printf("built frame\n");
-
-//		if(sendto(pf_sockid,buffer,EHTR_FRAME_SIZE,0,
-//											(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
-//			printf("Error in R_RPLY Send %s\n",strerror(errno));
-//			exit(-1);
-//		}
 
 		Sendto(pf_sockid, buffer, addr_ll, "R_RPLY");
 	}
@@ -389,18 +392,25 @@ void send_payload(int pf_sockfd, struct route_entry* rt,
 
 	frame = build_payload_frame(my_ip_addr,rt->dest_canonical_ipAddress,payload,force_dsc);
 
-	send_frame_for_odr(pf_sockfd,&frame,src_mac_addr,rt->next_hop_mac_address,rt->outg_inf_index);
+	send_frame_payload(pf_sockfd,&frame,rt->next_hop_mac_address,rt->outg_inf_index);
 }
 
 /**
  *
  */
-void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
-			char *src_mac_addr,char *nxt_hop_addr,int outg_inf_index){
+void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
+			char *nxt_hop_addr,int outg_inf_index){
 
 	struct sockaddr_ll addr_ll;
 
 	bzero(&addr_ll,sizeof(addr_ll));
+
+	char src_mac_addr[ETH_ALEN];
+
+	memcpy(src_mac_addr,get_inf_mac_addr(outg_inf_index),ETH_ALEN);
+
+	printf("sending src_mac_addr in payload\n");
+	printHWADDR(src_mac_addr);
 
 	memset(buffer,'\0',sizeof(buffer));
 	build_eth_frame(buffer,nxt_hop_addr,
@@ -414,12 +424,6 @@ void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
 
 	printf("sending the payload frame and outg inf :%s %d\n",frame->hdr.cn_dsc_ipaddr,outg_inf_index);
 
-//	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
-//					(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
-//		printf("Error in payload sent  %s\n",strerror(errno));
-//		exit(-1);
-//	}
-
 	Sendto(pf_sockfd, buffer, addr_ll,"PAY_LOAD");
 }
 
@@ -427,9 +431,9 @@ void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
  *
  */
 void send_frame_for_rreply(int pf_sockfd,struct odr_frame *send_frame,
-			char *src_mac_addr,char *dst_mac_addr,int inf_index){
+								char *dst_mac_addr,int inf_index){
 
-	send_frame_for_odr(pf_sockfd,send_frame,src_mac_addr,dst_mac_addr,inf_index);
+	send_frame_payload(pf_sockfd,send_frame,dst_mac_addr,inf_index);
 }
 
 /**

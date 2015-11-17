@@ -158,7 +158,8 @@ void store_rreq_frame(struct odr_frame *frame);
 void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr_frame *received_frame,
 		char *src_mac_addr, char* dst_mac_addr, bool is_belongs_to_me);
 
-void send_frame_rreply(int pf_sockid, struct odr_frame *frame, int hop_count,char *src_mac_addr, bool is_belongs_to_me);
+void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
+			int hop_count,bool is_belongs_to_me);
 
 void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 		struct odr_frame *frame);
@@ -172,6 +173,9 @@ struct odr_frame build_payload_frame(char *my_ip_address, char *dest_ip_addr,
 void build_eth_frame(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
 			struct sockaddr_ll *addr_ll,struct odr_frame *frame, int eth_pkt_type);
+
+void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
+			struct odr_frame *received_frame,char *src_mac_addr,char *dst_mac_addr);
 
 bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
 
@@ -187,7 +191,7 @@ void printRoutingTable(struct route_entry* head);
 
 char* Gethostname();
 
-void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20]);
+void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN]);
 
 void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType);
 
@@ -197,15 +201,14 @@ bool remove_data_payload(struct odr_frame *frame);
 
 struct odr_frame * get_next_send_packet(struct odr_frame *frame);
 
-void send_frame_for_rreply(int pf_sockfd,struct odr_frame *send_frame,
-			char *src_mac_addr,char *dst_mac_addr,int inf_index);
-
-void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
-			char *src_mac_addr,char *nxt_hop_addr,int outg_inf_index);
+void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
+			char *nxt_hop_addr,int outg_inf_index);
 
 void send_payload(int pf_sockfd, struct route_entry* rt,
 							char* my_ip_addr, char *src_mac_addr, char* payload,int force_dsc);
 
 void build_port_entries();
+
+char* get_inf_mac_addr(int inf_index);
 
 #endif /* USP_H_ */

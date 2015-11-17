@@ -203,7 +203,7 @@ Gethostbyname(char *my_name){
 	}
 }
 
-void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20])
+void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN])
 {
 	struct hwa_info	*temp = hw_head;
 	char   *ptr;
