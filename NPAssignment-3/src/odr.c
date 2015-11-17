@@ -130,13 +130,21 @@ int main(){
 
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
+			if(DEBUG)
+				printf("before host conversion pkt_type : %d",received_frame->hdr.pkt_type);
+
+			convertToHostOrder(&(received_frame->hdr));
+
+			if(DEBUG)
+				printf("after host conversion pkt_type : %d",received_frame->hdr.pkt_type);
+
 			printHWADDR(dest_mac_addr);
 			printHWADDR(src_mac_addr);
 
 			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
 			{
 				memcpy((void *)dest_mac_addr,(void *)inf_mac_addr_map[addr_ll.sll_ifindex],ETH_ALEN);
-				printf("After updating dest addr for broadcast packet");
+				printf("After updating dest addr for broadcast packet %d\n",addr_ll.sll_ifindex);
 				printHWADDR(dest_mac_addr);
 			}
 
@@ -168,7 +176,7 @@ int main(){
 					case R_REPLY:
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 						frame_to_send =  get_next_send_packet(received_frame);
-						send_frame_for_rreply(pf_sockfd,frame_to_send,src_mac_addr,dest_mac_addr,addr_ll.sll_ifindex);
+						send_frame_for_rreply(pf_sockfd,frame_to_send,dest_mac_addr,src_mac_addr,addr_ll.sll_ifindex);
 						remove_data_payload(received_frame);
 						break;
 
@@ -205,9 +213,4 @@ int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)
 {
 	return !strcmp(dest_ip_addr, my_ip_addr);
 }
-
-/**
- *  This will insert only if the path name doesn't exist.
- */
-
 

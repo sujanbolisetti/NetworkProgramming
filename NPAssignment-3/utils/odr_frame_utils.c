@@ -23,7 +23,14 @@ struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
 	hdr.broadcast_id = broadcast_id;
 	hdr.rreply_sent = rreply_sent;
 
-	convertToNetworkOrder(&hdr);
+	if(DEBUG)
+		printf("Before conversion pkt_type : %d",hdr.pkt_type);
+
+	//convertToNetworkOrder(&hdr);
+
+	if(DEBUG)
+		printf("after conversion pkt_type : %d",hdr.pkt_type);
+
 	return hdr;
 }
 
@@ -58,6 +65,8 @@ void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count){
 	rrep_frame->hdr.pkt_type = R_REPLY;
 	rrep_frame->hdr.hop_count = hop_count;
 
+	//convertToNetworkOrder(&(rrep_frame->hdr));
+
 }
 
 void build_eth_frame(void *buffer,char *dest_mac,
@@ -65,6 +74,8 @@ void build_eth_frame(void *buffer,char *dest_mac,
 			struct sockaddr_ll *addr_ll,struct odr_frame *frame, int eth_pkt_type){
 
 	bzero(addr_ll,sizeof(*addr_ll));
+
+	convertToNetworkOrder(&(frame->hdr));
 
 	unsigned char* etherhead = buffer;
 
@@ -77,6 +88,8 @@ void build_eth_frame(void *buffer,char *dest_mac,
 	addr_ll->sll_pkttype  = eth_pkt_type;
 	addr_ll->sll_protocol = htons(ODR_GRP_TYPE);
 	addr_ll->sll_halen    = ETH_ALEN;
+
+
 
 	memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
 	memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);

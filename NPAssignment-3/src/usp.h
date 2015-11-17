@@ -189,6 +189,8 @@ char* Gethostname();
 
 void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][20]);
 
+void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType);
+
 void printHWADDR(char* src_mac_addr);
 
 bool remove_data_payload(struct odr_frame *frame);

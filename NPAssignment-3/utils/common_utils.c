@@ -216,12 +216,18 @@ void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[10][2
 			printHWADDR(temp->if_haddr);
 
 		}
-		strcpy(inf_mac_addr_map[temp->if_index],temp->if_haddr);
+		memcpy((void *)inf_mac_addr_map[temp->if_index],(void *)temp->if_haddr,ETH_ALEN);
+		if(DEBUG){
+			printf("In fill In Map");
+			printHWADDR(inf_mac_addr_map[temp->if_index]);
+		}
 		temp = temp -> hwa_next;
 	}
 }
 
 void convertToNetworkOrder(struct odr_hdr *hdr){
+
+	printf("came into network order conversion\n");
 
 	hdr->broadcast_id = htonl(hdr->broadcast_id);
 	hdr->hop_count = htons(hdr->hop_count);
@@ -231,6 +237,8 @@ void convertToNetworkOrder(struct odr_hdr *hdr){
 }
 
 void convertToHostOrder(struct odr_hdr *hdr){
+
+	printf("came into host order conversion\n");
 
 	hdr->broadcast_id = ntohl(hdr->broadcast_id);
 	hdr->hop_count = ntohs(hdr->hop_count);
@@ -288,4 +296,11 @@ void build_port_entries()
 	port_entries[ODR_PORT] = port_entr;
 }
 
-
+void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType)
+{
+	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
+					(SA *)&addr_ll,sizeof(addr_ll)) < 0){
+		printf("Error in %s send error type  %s\n",sendType, strerror(errno));
+		exit(-1);
+	}
+}

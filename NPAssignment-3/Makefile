@@ -16,8 +16,8 @@ client: client.o wrapsock.o common_utils.o
 client.o: src/client.c ${DEPS}
 	${CC} ${FLAGS} -c src/client.c
 	
-server: server.o
-	${CC} ${FLAGS} server.o -o server ${LIBS}
+server: server.o wrapsock.o common_utils.o
+	${CC} ${FLAGS} server.o wrapsock.o common_utils.o -o server ${LIBS}
 
 odr: odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o
 	${CC} ${FLAGS} odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o -o odr ${LIBS}

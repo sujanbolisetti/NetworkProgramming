@@ -76,7 +76,6 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 
 		if(hw_temp->if_index != recv_inf_index){
 
-
 			memset(buffer,'\0',sizeof(buffer));
 			build_eth_frame(buffer,BROADCAST_MAC_ADDRESS,
 						hw_temp->if_haddr,hw_temp->if_index,
@@ -86,12 +85,12 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 															Gethostname(),frame->hdr.cn_dsc_ipaddr);
 			printHWADDR(BROADCAST_MAC_ADDRESS);
 
-			if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
+			/*if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
 							(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
 				printf("Error in R_REQ send to %s\n",strerror(errno));
 				exit(-1);
-			}
-
+			}*/
+			Sendto(pf_sockfd, buffer, addr_ll,"R_REQ");
 		}
 	}
 }
@@ -356,11 +355,13 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,int hop_count,char
 		if(DEBUG)
 			printf("built frame\n");
 
-		if(sendto(pf_sockid,buffer,EHTR_FRAME_SIZE,0,
-											(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
-			printf("Error in R_RPLY Send %s\n",strerror(errno));
-			exit(-1);
-		}
+//		if(sendto(pf_sockid,buffer,EHTR_FRAME_SIZE,0,
+//											(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
+//			printf("Error in R_RPLY Send %s\n",strerror(errno));
+//			exit(-1);
+//		}
+
+		Sendto(pf_sockid, buffer, addr_ll, "R_RPLY");
 	}
 	else
 	{
@@ -399,6 +400,8 @@ void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
 
 	struct sockaddr_ll addr_ll;
 
+	bzero(&addr_ll,sizeof(addr_ll));
+
 	memset(buffer,'\0',sizeof(buffer));
 	build_eth_frame(buffer,nxt_hop_addr,
 						src_mac_addr,outg_inf_index,
@@ -406,14 +409,18 @@ void send_frame_for_odr(int pf_sockfd,struct odr_frame *frame,
 
 	printf("Sending the frame in ODR\n");
 
+	printHWADDR(nxt_hop_addr);
+	printHWADDR(src_mac_addr);
 
-	printf("sending the payload frame :%s\n",frame->hdr.cn_dsc_ipaddr);
+	printf("sending the payload frame and outg inf :%s %d\n",frame->hdr.cn_dsc_ipaddr,outg_inf_index);
 
-	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
-					(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
-		printf("Error in payload sent  %s\n",strerror(errno));
-		exit(-1);
-	}
+//	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
+//					(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
+//		printf("Error in payload sent  %s\n",strerror(errno));
+//		exit(-1);
+//	}
+
+	Sendto(pf_sockfd, buffer, addr_ll,"PAY_LOAD");
 }
 
 /**
