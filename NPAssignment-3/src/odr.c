@@ -169,14 +169,16 @@ int main(){
 
 					case R_REQ:
 						if(DEBUG)
-							printf("Recieved my R_REQ destined to me\n");
+							printf("Received my R_REQ destined to me\n");
 						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
 																				received_frame,src_mac_addr,dest_mac_addr, true);
 						break;
 					case R_REPLY:
+						if(DEBUG)
+							printf("Received my R_RPLY destined to me\n");
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 						frame_to_send =  get_next_send_packet(received_frame);
-						send_frame_for_rreply(pf_sockfd,frame_to_send,dest_mac_addr,addr_ll.sll_ifindex);
+						send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, addr_ll.sll_ifindex);
 						remove_data_payload(received_frame);
 						break;
 
@@ -184,7 +186,8 @@ int main(){
 						// have to send the packet to the Unix domain socket - client
 					    // the port/path name of the client, you need to get from the mapping
 						// stored.
-						printf("payload received :%s\n",my_name);
+						if(DEBUG)
+							printf("Received pay_load destined to me %s\n", my_name);
 
 						break;
 
@@ -202,6 +205,10 @@ int main(){
 				case R_REPLY:
 					process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
 															received_frame,src_mac_addr,dest_mac_addr,false);
+					break;
+				case PAY_LOAD:
+					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+					forward_frame_payload(pf_sockfd, received_frame);
 					break;
 				}
 			}

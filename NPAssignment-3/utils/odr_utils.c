@@ -24,7 +24,7 @@ void *buffer;
 struct hwa_info	*hw_head;
 
 
-void odr_init(char inf_mac_addr_map[10][20]){
+void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN]){
 	hw_head = get_hw_addrs();
 	fill_inf_mac_addr_map(hw_head, inf_mac_addr_map);
 	buffer = (void*)malloc(EHTR_FRAME_SIZE);
@@ -409,7 +409,7 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 
 	memcpy(src_mac_addr,get_inf_mac_addr(outg_inf_index),ETH_ALEN);
 
-	printf("sending src_mac_addr in payload\n");
+	printf("Set src_mac_addr in payload\n");
 	printHWADDR(src_mac_addr);
 
 	memset(buffer,'\0',sizeof(buffer));
@@ -419,21 +419,31 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 
 	printf("Sending the frame in ODR\n");
 
+	printf("Sending payload frame to mac-addr");
 	printHWADDR(nxt_hop_addr);
+
+	printf("Sending payload from this interface %d mac-address ", outg_inf_index);
 	printHWADDR(src_mac_addr);
 
-	printf("sending the payload frame and outg inf :%s %d\n",frame->hdr.cn_dsc_ipaddr,outg_inf_index);
+	printf("Sending the payload frame and outg inf :%s %d\n",frame->hdr.cn_dsc_ipaddr,outg_inf_index);
 
 	Sendto(pf_sockfd, buffer, addr_ll,"PAY_LOAD");
 }
 
-/**
- *
- */
-void send_frame_for_rreply(int pf_sockfd,struct odr_frame *send_frame,
-								char *dst_mac_addr,int inf_index){
-
-	send_frame_payload(pf_sockfd,send_frame,dst_mac_addr,inf_index);
+void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
+{
+	struct route_entry* rt;
+	if((rt = get_rentry_in_rtable(frame->hdr.cn_dsc_ipaddr)) != NULL)
+	{
+		if(DEBUG)
+			printf("Found route entry to forward payload for dest ip addr %s\n", frame->hdr.cn_dsc_ipaddr);
+		send_frame_payload(pf_sockfd, frame, rt->next_hop_mac_address, rt->outg_inf_index);
+	}
+	else
+	{
+		if(DEBUG)
+			printf("No route exist in routing table for dest ip address %s\n", frame->hdr.cn_dsc_ipaddr);
+	}
 }
 
 /**
@@ -442,8 +452,6 @@ void send_frame_for_rreply(int pf_sockfd,struct odr_frame *send_frame,
 struct odr_frame * get_next_send_packet(struct odr_frame *frame){
 
 	struct odr_frame_node *temp = next_to_list_head;
-
-
 
 	while(temp != NULL){
 
@@ -454,7 +462,7 @@ struct odr_frame * get_next_send_packet(struct odr_frame *frame){
 				&& !strcmp(temp-> frame.hdr.cn_src_ipaddr,frame->hdr.cn_dsc_ipaddr)){
 
 			if(DEBUG)
-				printf("retrieving the payload frame with rreq id : %d\n",temp->frame.hdr.rreq_id);
+				printf("retrieving the payload frame with rreq id : %d\n", temp->frame.hdr.rreq_id);
 
 			temp->frame.hdr.force_route_dcvry = 0;
 			return &(temp->frame);

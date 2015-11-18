@@ -211,4 +211,6 @@ void build_port_entries();
 
 char* get_inf_mac_addr(int inf_index);
 
+void forward_frame_payload(int pf_sockfd,struct odr_frame *frame);
+
 #endif /* USP_H_ */
