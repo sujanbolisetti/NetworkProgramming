@@ -74,10 +74,11 @@ struct port_entry{
 	int time_stamp;
 };
 
-struct reply_from_uds{
+struct msg_from_uds{
 	char* msg_received;
 	char* canonical_ipAddress;
-	int portNumber;
+	int dest_port_num;
+	int src_port_num;
 	int flag;
 };
 
@@ -94,14 +95,17 @@ struct route_entry{
 
 struct odr_hdr{
 
-	char cn_src_ipaddr[20];
-	char cn_dsc_ipaddr[20];
-	uint16_t hop_count;
 	uint16_t pkt_type;
+	char cn_src_ipaddr[20];
+	uint16_t src_port_num;
+	char cn_dsc_ipaddr[20];
+	uint16_t dest_port_num;
+	uint16_t hop_count;
 	uint16_t force_route_dcvry;
 	int broadcast_id;
 	int rreq_id;
 	uint16_t rreply_sent;
+	uint16_t payload_len;
 };
 
 /**
@@ -125,7 +129,7 @@ void odr_init();
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag);
 
-struct reply_from_uds * msg_receive(int sockfd);
+struct msg_from_uds * msg_receive(int sockfd);
 
 void build_port_entries();
 
@@ -164,11 +168,15 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
 void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 		struct odr_frame *frame);
 
-struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
-			int frc_dsc,int rreply_sent,char *pay_load);
+struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
+		int broadcast_id, int rreq_id, int frc_dsc,int rreply_sent);
 
-struct odr_frame build_payload_frame(char *my_ip_address, char *dest_ip_addr,
-		char *payload,int force_dsc);
+struct odr_hdr build_odr_payload_hdr(char *src, int pkt_type, struct msg_from_uds *msg);
+
+struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
+			int rreq_id, int frc_dsc,int rreply_sent,char *pay_load,struct msg_from_uds *msg);
+
+struct odr_frame build_payload_frame(int rreq_id,char *my_ip_address, struct msg_from_uds *msg);
 
 void build_eth_frame(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
@@ -204,13 +212,18 @@ struct odr_frame * get_next_send_packet(struct odr_frame *frame);
 void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 			char *nxt_hop_addr,int outg_inf_index);
 
-void send_payload(int pf_sockfd, struct route_entry* rt,
-							char* my_ip_addr, char *src_mac_addr, char* payload,int force_dsc);
-
 void build_port_entries();
 
 char* get_inf_mac_addr(int inf_index);
 
 void forward_frame_payload(int pf_sockfd,struct odr_frame *frame);
+
+char* get_path_name(int dest_port_num);
+
+void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int src_port_num,
+		char* message,int flag);
+
+char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
+		char* message,int flag);
 
 #endif /* USP_H_ */

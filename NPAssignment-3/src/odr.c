@@ -71,15 +71,19 @@ int main(){
 
 		if(FD_ISSET(sockfd,&rset)){
 
-			struct reply_from_uds *reply = msg_receive(sockfd);
+			struct msg_from_uds *reply = msg_receive(sockfd);
+
+
+			struct odr_frame payload_frame;
+
+			payload_frame = build_payload_frame(r_req_id++,my_ip_address,reply);
 
 
 			// have to exclude this even when force_route_discovery.
 			// have to implement retransmission for r_req
 			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress)) != NULL && !reply->flag){
 
-				send_payload(pf_sockfd,rt,my_ip_address, inf_mac_addr_map[rt->outg_inf_index],
-							reply->msg_received,reply->flag);
+				send_frame_payload(pf_sockfd,&payload_frame,rt->next_hop_mac_address,rt->outg_inf_index);
 
 			}else{
 
@@ -89,12 +93,6 @@ int main(){
 				 *  3. Fill in the routing table and send the payload.
 				 */
 
-				struct odr_frame payload_frame;
-				payload_frame = build_payload_frame(my_ip_address,reply->canonical_ipAddress,
-											reply->msg_received,reply->flag);
-
-				payload_frame.hdr.rreq_id = r_req_id++;
-
 				if(DEBUG){
 					printf("broad_cast id %d  r_req id %d\n",r_req_id-1,broadcast_id);
 				}
@@ -102,9 +100,9 @@ int main(){
 				store_next_to_send_frame(&payload_frame);
 
 				frame = build_odr_frame(my_ip_address,reply->canonical_ipAddress,
-						ZERO_HOP_COUNT,R_REQ,broadcast_id++,reply->flag,R_REPLY_NOT_SENT,NULL);
+						ZERO_HOP_COUNT,R_REQ,broadcast_id++,payload_frame.hdr.rreq_id,reply->flag,R_REPLY_NOT_SENT,NULL,NULL);
 
-				frame.hdr.rreq_id = payload_frame.hdr.rreq_id;
+//				frame.hdr.rreq_id = payload_frame.hdr.rreq_id;
 
 				send_frame_rreq(pf_sockfd,-1,&frame);
 			}
@@ -131,12 +129,14 @@ int main(){
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
 			if(DEBUG)
-				printf("before host conversion pkt_type : %d",received_frame->hdr.pkt_type);
+				printf("before host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
 
 			convertToHostOrder(&(received_frame->hdr));
 
+			//update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+
 			if(DEBUG)
-				printf("after host conversion pkt_type : %d",received_frame->hdr.pkt_type);
+				printf("after host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
 
 			printHWADDR(dest_mac_addr);
 			printHWADDR(src_mac_addr);
@@ -188,7 +188,13 @@ int main(){
 						// stored.
 						if(DEBUG)
 							printf("Received pay_load destined to me %s\n", my_name);
+						//TODO : have to write proper code for payload sending to above uds process.
 
+						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+
+						printf("Sending the message to the server/client\n");
+						msg_send_to_uds(sockfd,received_frame->hdr.cn_src_ipaddr,received_frame->hdr.src_port_num,received_frame->hdr.dest_port_num,
+										received_frame->payload,received_frame->hdr.force_route_dcvry);
 						break;
 
 					}

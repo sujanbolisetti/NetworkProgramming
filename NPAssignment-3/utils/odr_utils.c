@@ -373,27 +373,17 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
 	}
 }
 
-struct odr_frame build_payload_frame(char *my_ip_address, char *dest_ip_addr,
-		char *payload,int force_dsc){
+struct odr_frame build_payload_frame(int rreq_id,char *my_ip_address, struct msg_from_uds *msg){
 
 	if(DEBUG){
-		printf("Building the payload frame with destination ip_address %s\n",dest_ip_addr);
+		printf("Building the payload frame with destination ip_address %s\n",msg->canonical_ipAddress);
 	}
 
-	return build_odr_frame(my_ip_address,dest_ip_addr,
-								ZERO_HOP_COUNT,PAY_LOAD,-1,force_dsc,R_REPLY_NOT_SENT,payload);
+	return build_odr_frame(my_ip_address,msg->canonical_ipAddress,
+								ZERO_HOP_COUNT,PAY_LOAD,INVALID_ENTRY,rreq_id,NO_FORCE_DSC,R_REPLY_NOT_SENT,msg->msg_received,msg);
 
 }
 
-void send_payload(int pf_sockfd, struct route_entry* rt,
-							char* my_ip_addr, char *src_mac_addr, char* payload,int force_dsc)
-{
-	struct odr_frame frame;
-
-	frame = build_payload_frame(my_ip_addr,rt->dest_canonical_ipAddress,payload,force_dsc);
-
-	send_frame_payload(pf_sockfd,&frame,rt->next_hop_mac_address,rt->outg_inf_index);
-}
 
 /**
  *

@@ -12,7 +12,7 @@
  *  Method to build the header of the odr_frame.
  */
 struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
-		int broadcast_id, int frc_dsc,int rreply_sent){
+		int broadcast_id, int rreq_id, int frc_dsc,int rreply_sent){
 
 	struct odr_hdr hdr;
 	strcpy(hdr.cn_src_ipaddr, src);
@@ -22,30 +22,43 @@ struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
 	hdr.pkt_type = pkt_type;
 	hdr.broadcast_id = broadcast_id;
 	hdr.rreply_sent = rreply_sent;
-
-	if(DEBUG)
-		printf("Before conversion pkt_type : %d",hdr.pkt_type);
-
-	//convertToNetworkOrder(&hdr);
-
-	if(DEBUG)
-		printf("after conversion pkt_type : %d",hdr.pkt_type);
+	hdr.rreq_id = rreq_id;
 
 	return hdr;
 }
 
 /**
+ * Method build a payload frame
+ */
+struct odr_hdr build_odr_payload_hdr(char *src, int pkt_type, struct msg_from_uds *msg){
+
+	struct odr_hdr hdr;
+
+	hdr = build_odr_hdr(src,msg->canonical_ipAddress,
+								ZERO_HOP_COUNT,pkt_type,INVALID_ENTRY,INVALID_ENTRY,msg->flag,R_REPLY_NOT_SENT);
+
+	hdr.dest_port_num = msg->dest_port_num;
+	hdr.src_port_num = msg->src_port_num;
+	hdr.payload_len = strlen(msg->msg_received);
+	hdr.rreq_id = INVALID_ENTRY;
+
+	return hdr;
+}
+
+
+/**
  *  Method to build the frame.
  */
 struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
-			int frc_dsc,int rreply_sent,char *pay_load){
+			int rreq_id, int frc_dsc,int rreply_sent,char *pay_load,struct msg_from_uds *msg){
 
 		struct odr_frame frame;
 
-		frame.hdr = build_odr_hdr(src,dst,hop_count,pkt_type, broadcast_id, frc_dsc,rreply_sent);
-
 		if(pkt_type == PAY_LOAD && pay_load != NULL){
+			frame.hdr = build_odr_payload_hdr(src,pkt_type,msg);
 			strcpy(frame.payload,pay_load);
+		}else{ // for rreply and rreq's
+			frame.hdr = build_odr_hdr(src,dst,hop_count,pkt_type, broadcast_id, rreq_id,frc_dsc,rreply_sent);
 		}
 
 		return frame;
@@ -64,9 +77,6 @@ void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count){
 
 	rrep_frame->hdr.pkt_type = R_REPLY;
 	rrep_frame->hdr.hop_count = hop_count;
-
-	//convertToNetworkOrder(&(rrep_frame->hdr));
-
 }
 
 void build_eth_frame(void *buffer,char *dest_mac,

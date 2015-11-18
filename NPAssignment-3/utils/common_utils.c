@@ -14,14 +14,89 @@ bool isHostNameFilled = false;
 
 struct port_entry port_entries[NUM_PORT_ENTRIES];
 
-int port_num = 2;
+int port_num = 3;
 
 
 void
 msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag){
 
+	char* msg_odr = build_msg_odr(sockfd, destIpAddress, destPortNumber, message, flag);
+//	= malloc(sizeof(char)*1024);
+//
+//	char *temp = msg_odr;
+//
+//	int length=0;
+//	char temp_str[120];
+//
+//	printf("%s\n",destIpAddress);
+//
+//	strcpy(msg_odr,destIpAddress);
+//
+//	sprintf(temp_str,"%d",destPortNumber);
+//
+//	printf("%s\n",temp_str);
+//
+//	length = strlen(destIpAddress);
+//
+//	msg_odr[length] = '$';
+//
+//	strcpy(msg_odr+length+1,temp_str);
+//
+//	length += strlen(temp_str);
+//
+//	msg_odr[length] = '$';
+//
+//	strcpy(msg_odr+length+1,message);
+//
+//	printf("%s\n",message);
+//
+//	if(strlen(message)){
+//		length+=strlen(message);
+//	}else{
+//		length+=1;
+//	}
+//
+//	msg_odr[length] = '$';
+//
+//	memset(temp_str,'\0',sizeof(temp_str));
+//
+//	sprintf(temp_str,"%d",flag);
+//
+//	printf("%s\n",temp_str);
+//
+//	strcpy(msg_odr+length+1,temp_str);
+//
+//	printf("length %d\n",length);
+//	printf("complete string %s\n",temp);
+
+
+	if(write(sockfd,msg_odr,strlen(msg_odr)) <  0){
+		printf("write failed with error :%s\n",strerror(errno));
+	}
+}
+
+void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int src_port_num,
+		char* message,int flag)
+{
+	char* msg_odr = build_msg_odr(sockfd, destIpAddress, destPortNumber, message, flag);
+	struct sockaddr_un serverAddr;
+
+	serverAddr.sun_family = AF_LOCAL;
+	strcpy(serverAddr.sun_path,get_path_name(src_port_num));
+
+	printf("Path name for uds process %s\n",serverAddr.sun_path);
+
+	if(sendto(sockfd,msg_odr,strlen(msg_odr),0,(SA*)&serverAddr,sizeof(serverAddr)) < 0){
+		printf("Error in send to uds %s\n",strerror(errno));
+	}
+}
+
+char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
+		char* message,int flag)
+{
 	char* msg_odr = malloc(sizeof(char)*1024);
+	memset(msg_odr,'\0',sizeof(msg_odr));
 
 	char *temp = msg_odr;
 
@@ -43,6 +118,8 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 	strcpy(msg_odr+length+1,temp_str);
 
 	length += strlen(temp_str);
+
+	printf("******length of th port number************* %lu\n",strlen(temp_str));
 
 	msg_odr[length] = '$';
 
@@ -68,33 +145,29 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 
 	printf("length %d\n",length);
 	printf("complete string %s\n",temp);
-
-	if(write(sockfd,temp,strlen(temp)) <  0){
-		printf("write failed with error :%s\n",strerror(errno));
-	}
+	return temp;
 }
 
+struct msg_from_uds * msg_receive(int sockfd){
 
-struct reply_from_uds * msg_receive(int sockfd){
-
-	struct reply_from_uds *reply = (struct reply_from_uds *)malloc(sizeof(struct reply_from_uds));
+	struct msg_from_uds *reply = (struct msg_from_uds *)malloc(sizeof(struct msg_from_uds));
 	char* msg_odr = (char *)malloc(sizeof(char)*1024);
-	memset(reply, '\0', sizeof(struct reply_from_uds));
+	memset(msg_odr,'\0',sizeof(msg_odr));
+	memset(reply, '\0', sizeof(struct msg_from_uds));
 	struct sockaddr_un peerAddress;
 	bzero(&peerAddress,sizeof(peerAddress));
-	int port_number;
+	int src_port_num;
 	int len = sizeof(struct sockaddr_un);
 
-	//bzero(reply,);
 	if(recvfrom(sockfd, msg_odr, MSG_LEN, 0, (SA*)&peerAddress, &len) > 0){
-		printf("messaged received %s\n",msg_odr);
+		printf("messaged received : %s\n",msg_odr);
 	}
 
+	printf("path_name of the client/server %s\n",peerAddress.sun_path);
 
-	printf("path_name of the client %s\n",peerAddress.sun_path);
+	src_port_num = add_port_entry(peerAddress.sun_path);
 
-	port_number = add_port_entry(peerAddress.sun_path);
-
+	reply->src_port_num = src_port_num;
 
 	int length = strlen(msg_odr);
 	int i=0,k=0,dollarCount = 0,start_index=0;
@@ -106,9 +179,6 @@ struct reply_from_uds * msg_receive(int sockfd){
 			dollarCount++;
 			i++;
 		}else{
-//			if(DEBUG)
-				//printf("character %c\n",msg_odr[i]);
-
 			tmp_str[k] = msg_odr[i];
 			i++;
 			k++;
@@ -120,8 +190,6 @@ struct reply_from_uds * msg_receive(int sockfd){
 		case 1:
 			if(reply->canonical_ipAddress == NULL){
 				tmp_str[k] = '\0';
-
-				//printf("ip-address %s\n",tmp_str);
 				reply->canonical_ipAddress = malloc(sizeof(char)*128);
 				strcpy(reply->canonical_ipAddress,tmp_str);
 				memset(tmp_str,'\0',sizeof(tmp_str));
@@ -132,33 +200,19 @@ struct reply_from_uds * msg_receive(int sockfd){
 			if(reply->msg_received ==  NULL){
 				tmp_str[k] = '\0';
 				reply->msg_received = malloc(sizeof(char)*1024);
-
-				if(!tmp_str[0]){
-
-					if(DEBUG)
-						printf("Entered into populating the portNumber in the msg field\n");
-
-					char port_str[10];
-					sprintf(port_str,"%d",port_number);
-					strcpy(reply->msg_received,port_str);
-				}
-				else{
-					strcpy(reply->msg_received,tmp_str);
-				}
+				strcpy(reply->msg_received,tmp_str);
 				memset(tmp_str,'\0',sizeof(tmp_str));
 				k=0;
 			}
 			break;
 		case 2:
-			//if(reply->portNumber ==  NULL)
-			{
 				tmp_str[k] = '\0';
 				int portNumber = atoi(tmp_str);
 				//printf("port number %d\n",portNumber);
-				reply->portNumber = portNumber;
+				reply->dest_port_num = portNumber;
 				memset(tmp_str,'\0',sizeof(tmp_str));
 				k=0;
-			}
+
 			break;
 		}
 
@@ -166,8 +220,9 @@ struct reply_from_uds * msg_receive(int sockfd){
 
 	reply->flag = atoi(tmp_str);
 
-	if(!DEBUG)
-		printf("reply parameters : %s %d %s	%d\n",reply->canonical_ipAddress,(reply->portNumber),reply->msg_received,reply->flag);
+	if(DEBUG)
+		printf("application pay_load parameters ip_address : %s\n dest_port_num : %d\n src_port_num :%d\n  payload : %s\n force_dsc_flag : %d\n",
+								        reply->canonical_ipAddress,reply->dest_port_num,reply->src_port_num,reply->msg_received,reply->flag);
 
 	return reply;
 }
@@ -227,24 +282,35 @@ void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[MAX_I
 
 void convertToNetworkOrder(struct odr_hdr *hdr){
 
-	printf("came into network order conversion\n");
+	if(DEBUG)
+		printf("came into network order conversion\n");
 
 	hdr->broadcast_id = htonl(hdr->broadcast_id);
 	hdr->hop_count = htons(hdr->hop_count);
 	hdr->pkt_type = htons(hdr->pkt_type);
 	hdr->force_route_dcvry = htons(hdr->force_route_dcvry);
 	hdr->rreply_sent = htons(hdr->rreply_sent);
+	hdr->dest_port_num = htons(hdr->dest_port_num);
+	hdr->src_port_num = htons(hdr->src_port_num);
+	hdr->rreq_id = htonl(hdr->rreq_id);
+	hdr->payload_len = htons(hdr->payload_len);
+
 }
 
 void convertToHostOrder(struct odr_hdr *hdr){
 
-	printf("came into host order conversion\n");
+	if(DEBUG)
+		printf("came into host order conversion\n");
 
 	hdr->broadcast_id = ntohl(hdr->broadcast_id);
 	hdr->hop_count = ntohs(hdr->hop_count);
 	hdr->pkt_type = ntohs(hdr->pkt_type);
 	hdr->force_route_dcvry = ntohs(hdr->force_route_dcvry);
 	hdr->rreply_sent = ntohs(hdr->rreply_sent);
+	hdr->dest_port_num = ntohs(hdr->dest_port_num);
+	hdr->src_port_num = ntohs(hdr->src_port_num);
+	hdr->rreq_id = ntohl(hdr->rreq_id);
+	hdr->payload_len = ntohs(hdr->payload_len);
 }
 
 
@@ -303,4 +369,9 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 		printf("Error in %s send error type  %s\n",sendType, strerror(errno));
 		exit(-1);
 	}
+}
+
+char* get_path_name(int dest_port_num){
+
+	return port_entries[dest_port_num].path_name;
 }

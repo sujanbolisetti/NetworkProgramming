@@ -52,8 +52,12 @@
 
 #define NUM_PORT_ENTRIES 200
 
-#define SERVER_PORT 0
+#define SERVER_PORT 1
 
-#define ODR_PORT 1
+#define ODR_PORT 2
+
+#define INVALID_ENTRY -1
+
+#define NO_FORCE_DSC 0
 
 #endif /* CONSTANTS_H_ */

@@ -11,7 +11,14 @@ int main(){
 
 	int listenfd;
 	char write_buff[MAXLINE];
-	struct reply_from_uds *reply;
+	struct msg_from_uds *msg;
+	char my_name[128];
+
+
+	memset(my_name,'\0',sizeof(my_name));
+	gethostname(my_name,sizeof(my_name));
+
+	printf("Host Name of the Server Node : %s\n",my_name);
 
 	struct sockaddr_un serverAddr,odr_addr;
 	listenfd = socket(AF_LOCAL,SOCK_DGRAM,0);
@@ -25,19 +32,25 @@ int main(){
 	strcpy(serverAddr.sun_path,SERVER_WELL_KNOWN_PATH_NAME);
 	strcpy(odr_addr.sun_path,ODR_PATH_NAME);
 
+	unlink(SERVER_WELL_KNOWN_PATH_NAME);
+
 	Bind(listenfd,(SA *)&serverAddr,sizeof(serverAddr));
 
 	Connect(listenfd,(SA *)&odr_addr,sizeof(odr_addr));
 
 	for(;;){
 
-		reply = msg_receive(listenfd);
+		msg = msg_receive(listenfd);
+
+		printf("Message received in the server on port_num %d\n",msg->dest_port_num);
 
 		time_t ticks = time(NULL);
 
 		snprintf(write_buff, sizeof(write_buff), "%.24s\r\n" , ctime(&ticks));
 
-		msg_send(listenfd,reply->canonical_ipAddress,reply->portNumber,write_buff,reply->flag);
+		printf("Server the sending the time %s\n",write_buff);
+
+		msg_send(listenfd,msg->canonical_ipAddress,msg->dest_port_num,write_buff,msg->flag);
 	}
 
 	return 0;

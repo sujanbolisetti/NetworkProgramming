@@ -51,19 +51,19 @@ int main(){
 
 	Bind(sockfd,(SA *)&cli_addr,sizeof(cli_addr));
 
-	// TODO : have uncomment on running a ODR process.
 	Connect(sockfd,&odr_addr,sizeof(odr_addr));
 
 	memset(my_name,'\0',sizeof(my_name));
 	gethostname(my_name,sizeof(my_name));
 
-	printf("Host Name of the Node : %s\n",my_name);
+	printf("Host Name of the Client Node : %s\n",my_name);
 
 	strcpy(ipAddress,Gethostbyname(my_name));
 
 	printf("Primary IP_Address of the node : %s\n",ipAddress);
 
 	for(;;){
+
 
 		printf("Enter the server node name (vm1....vm10)\n");
 
@@ -75,7 +75,11 @@ int main(){
 
 		printf("client node at %s sending the request to server at %s\n",my_name,server_vm_name);
 
-		msg_send(sockfd,Gethostbyname(server_vm_name),4234,"",0);
+		msg_send(sockfd,Gethostbyname(server_vm_name),SERVER_PORT,"",0);
+
+		struct msg_from_uds *msg = msg_receive(sockfd);
+
+		printf("Received the time from server %s\n",msg->msg_received);
 
 	}
 
