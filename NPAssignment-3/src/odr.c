@@ -73,6 +73,7 @@ int main(){
 
 			struct msg_from_uds *reply = msg_receive(sockfd);
 
+			printf("%s In msg received %d\n",my_name, reply->dest_port_num);
 
 			struct odr_frame payload_frame;
 

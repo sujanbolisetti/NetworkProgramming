@@ -14,7 +14,7 @@ bool isHostNameFilled = false;
 
 struct port_entry port_entries[NUM_PORT_ENTRIES];
 
-int port_num = 3;
+int port_num = 2;
 
 
 void
@@ -85,6 +85,8 @@ void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int sr
 	serverAddr.sun_family = AF_LOCAL;
 	strcpy(serverAddr.sun_path,get_path_name(src_port_num));
 
+	printf("In Message Send to Uds port Numbers dest %d and src %d\n",destPortNumber,src_port_num);
+
 	printf("Path name for uds process %s\n",serverAddr.sun_path);
 
 	if(sendto(sockfd,msg_odr,strlen(msg_odr),0,(SA*)&serverAddr,sizeof(serverAddr)) < 0){
@@ -117,7 +119,7 @@ char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 
 	strcpy(msg_odr+length+1,temp_str);
 
-	length += strlen(temp_str);
+	length+= 1 + strlen(temp_str);
 
 	printf("******length of th port number************* %lu\n",strlen(temp_str));
 
@@ -127,11 +129,7 @@ char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 
 	printf("%s\n",message);
 
-	if(strlen(message)){
-		length+=strlen(message);
-	}else{
-		length+=1;
-	}
+    length+=1+strlen(message);
 
 	msg_odr[length] = '$';
 
@@ -329,11 +327,17 @@ void printHWADDR(char *hw_addr){
 int add_port_entry(char* path_name)
 {
 
+	if(DEBUG)
+		printf("path_name received in add_port_entry %s\n",path_name);
+
 	int i = 0;
 	// Checking the path_name is present or not.
-	for(i=0;i < NUM_PORT_ENTRIES;i++){
+	for(i=1;i < NUM_PORT_ENTRIES;i++){
 
 		if(!strcmp(path_name,port_entries[i].path_name)){
+			if(DEBUG){
+				printf("got a matched entry in add port num with index :%d\n",i);
+			}
 			return i;
 		}
 	}
@@ -343,6 +347,9 @@ int add_port_entry(char* path_name)
 	port_num++;
 	port_entr.port_num = port_num;
 	strcpy(port_entr.path_name,path_name);
+
+	port_entries[port_num] = port_entr;
+	printf("Inserted the port entry with index %d\n",port_num);
 	// have to insert a time stamp.
 	return port_num;
 }
@@ -351,13 +358,13 @@ void build_port_entries()
 {
 	struct port_entry port_entr;
 
-	port_entr.port_num = 0;
+	port_entr.port_num = SERVER_PORT;
 	strcpy(port_entr.path_name, SERVER_WELL_KNOWN_PATH_NAME);
 	port_entries[SERVER_PORT] = port_entr;
 
 	bzero(&port_entr, sizeof(port_entr));
 
-	port_entr.port_num = 1;
+	port_entr.port_num = ODR_PORT;
 	strcpy(port_entr.path_name, ODR_PATH_NAME);
 	port_entries[ODR_PORT] = port_entr;
 }
