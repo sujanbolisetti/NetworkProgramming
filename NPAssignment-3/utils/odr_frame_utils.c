@@ -76,6 +76,7 @@ void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count){
 	strcpy(rrep_frame->hdr.cn_dsc_ipaddr,temp);
 
 	rrep_frame->hdr.pkt_type = R_REPLY;
+	//rrep_frame->hdr.force_route_dcvry = 0; // Force route discovery is only for R-REQ?
 	rrep_frame->hdr.hop_count = hop_count;
 }
 

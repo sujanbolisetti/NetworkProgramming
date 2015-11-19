@@ -8,6 +8,7 @@
 #include "usp.h"
 
 char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN];
+int route_entry_timeout = 30; // default taken as 30 seconds
 
 int main(){
 
@@ -56,7 +57,7 @@ int main(){
 
 	maxfd = max(sockfd,pf_sockfd)+1;
 
-	odr_init(inf_mac_addr_map);
+	odr_init(inf_mac_addr_map, route_entry_timeout);
 
 	for(;;){
 
@@ -79,7 +80,6 @@ int main(){
 
 			payload_frame = build_payload_frame(r_req_id++,my_ip_address,reply);
 
-
 			// have to exclude this even when force_route_discovery.
 			// have to implement retransmission for r_req
 			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress)) != NULL && !reply->flag){
@@ -95,7 +95,7 @@ int main(){
 				 */
 
 				if(DEBUG){
-					printf("broad_cast id %d  r_req id %d\n",r_req_id-1,broadcast_id);
+					printf("broad_cast id %d  r_req id %d\n", r_req_id-1, broadcast_id);
 				}
 
 				store_next_to_send_frame(&payload_frame);
@@ -130,17 +130,14 @@ int main(){
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
 			if(DEBUG)
-				printf("before host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
+				printf("Before host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
 
 			convertToHostOrder(&(received_frame->hdr));
 
 			//update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 
 			if(DEBUG)
-				printf("after host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
-
-			printHWADDR(dest_mac_addr);
-			printHWADDR(src_mac_addr);
+				printf("After host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
 
 			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
 			{
@@ -149,14 +146,22 @@ int main(){
 				printHWADDR(dest_mac_addr);
 			}
 
-			printf("packet type from sockaddr_ll %d\n",addr_ll.sll_pkttype);
+			if(DEBUG)
+			{
+				printf("Packet came from mac-addr ");
+				printHWADDR(dest_mac_addr);
+				printf("Packet destined to mac-addr");
+				printHWADDR(src_mac_addr);
+			}
+
+			printf("Packet type from sockaddr_ll %d\n", addr_ll.sll_pkttype);
 
 			if(DEBUG)
-				printf("ip-address %s\n",received_frame->hdr.cn_dsc_ipaddr);
+				printf("Packet destined ip-address %s\n", received_frame->hdr.cn_dsc_ipaddr);
 
 			if(is_frame_belongs_to_me(received_frame->hdr.cn_dsc_ipaddr, my_ip_address))
 			{
-				printf("%s has received a packet with type %d which belongs it\n",my_name,received_frame->hdr.pkt_type);
+				printf("%s has received a packet with type %d which belongs to it\n", my_name, received_frame->hdr.pkt_type);
 				// TODO: send R_REPLY_SENT
 				// have to send application payload/r_reply based on the
 				// type of the frame received.
@@ -167,17 +172,17 @@ int main(){
 				struct odr_frame *frame_to_send;
 
 				switch(received_frame->hdr.pkt_type){
-
 					case R_REQ:
 						if(DEBUG)
-							printf("Received my R_REQ destined to me\n");
+							printf("Received my R_REQ with id %d\n", received_frame->hdr.rreq_id);
 						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
-																				received_frame,src_mac_addr,dest_mac_addr, true);
+												received_frame,src_mac_addr,dest_mac_addr, true);
 						break;
 					case R_REPLY:
 						if(DEBUG)
 							printf("Received my R_RPLY destined to me\n");
-						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+								received_frame->hdr.hop_count,addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
 						frame_to_send =  get_next_send_packet(received_frame);
 						send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, addr_ll.sll_ifindex);
 						remove_data_payload(received_frame);
@@ -189,9 +194,10 @@ int main(){
 						// stored.
 						if(DEBUG)
 							printf("Received pay_load destined to me %s\n", my_name);
-						//TODO : have to write proper code for payload sending to above uds process.
+						// TODO : have to write proper code for payload sending to above uds process.
 
-						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
+								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
 
 						printf("Sending the message to the server/client\n");
 						msg_send_to_uds(sockfd,received_frame->hdr.cn_src_ipaddr,received_frame->hdr.src_port_num,received_frame->hdr.dest_port_num,
@@ -210,11 +216,13 @@ int main(){
 															received_frame,src_mac_addr,dest_mac_addr);
 					break;
 				case R_REPLY:
+					// TODO: if r_rly as supports force discovery then need to take care of it also
 					process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
 															received_frame,src_mac_addr,dest_mac_addr,false);
 					break;
 				case PAY_LOAD:
-					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
+					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
+							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
 					forward_frame_payload(pf_sockfd, received_frame);
 					break;
 				}
@@ -240,3 +248,12 @@ char* get_inf_mac_addr(int inf_index)
 	}
 }
 
+int get_route_entry_timeout()
+{
+	return route_entry_timeout;
+}
+
+void set_route_entry_timeout(int timeout)
+{
+	route_entry_timeout = timeout;
+}

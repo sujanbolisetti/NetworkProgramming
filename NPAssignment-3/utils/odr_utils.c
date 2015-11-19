@@ -24,11 +24,12 @@ void *buffer;
 struct hwa_info	*hw_head;
 
 
-void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN]){
+void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN], int timeout){
 	hw_head = get_hw_addrs();
 	fill_inf_mac_addr_map(hw_head, inf_mac_addr_map);
 	buffer = (void*)malloc(EHTR_FRAME_SIZE);
 	build_port_entries();
+	set_route_entry_timeout(timeout);
 }
 
 
@@ -85,11 +86,6 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 															Gethostname(),frame->hdr.cn_dsc_ipaddr);
 			printHWADDR(BROADCAST_MAC_ADDRESS);
 
-			/*if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
-							(struct sockaddr *)&addr_ll,sizeof(addr_ll)) < 0){
-				printf("Error in R_REQ send to %s\n",strerror(errno));
-				exit(-1);
-			}*/
 			Sendto(pf_sockfd, buffer, addr_ll,"R_REQ");
 		}
 	}
@@ -107,10 +103,11 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr_frame *received_frame,
 		char *src_mac_addr, char* dst_mac_addr, bool is_belongs_to_me){
 
-	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,received_inf_ind);
+	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+			received_frame->hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry);
 	if(remove_rreq_frame(received_frame) || is_belongs_to_me)
 	{
-		send_frame_rreply(pf_sockid, received_frame,INVALID_HOP_COUNT,is_belongs_to_me);
+		send_frame_rreply(pf_sockid, received_frame, INVALID_HOP_COUNT, is_belongs_to_me);
 	}
 	else
 	{
@@ -152,9 +149,10 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	 */
 	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
 
-		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr)) != NULL){
+		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr)) != NULL && !received_frame->hdr.force_route_dcvry){
 			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
-			if(update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count, received_inf_ind)){
+			if(update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
+					org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry)){
 				org_received_frame.hdr.rreply_sent = 1;
 				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
 			}
@@ -164,7 +162,7 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 				store_rreq_frame(received_frame);
 			}
 
-			update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count, received_inf_ind);
+			update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry);
 			send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
 		}
 	}
@@ -329,7 +327,7 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
 
 		if(is_belongs_to_me){
 			if(DEBUG)
-				printf("Updating ZERO hop count\n");
+				printf("Updating ZERO hop count as R_RPLY is starting by me\n");
 			build_rreply_odr_frame(frame, ZERO_HOP_COUNT);
 		}else{
 			if(DEBUG)

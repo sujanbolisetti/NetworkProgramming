@@ -58,7 +58,6 @@
 
 #define SA struct sockaddr
 
-
 #define	min(a,b)	((a) < (b) ? (a) : (b))
 #define	max(a,b)	((a) > (b) ? (a) : (b))
 
@@ -124,7 +123,7 @@ struct odr_frame_node
 	struct odr_frame_node *next;
 };
 
-void odr_init();
+void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN], int timeout);
 
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag);
@@ -185,7 +184,7 @@ void build_eth_frame(void *buffer,char *dest_mac,
 void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 			struct odr_frame *received_frame,char *src_mac_addr,char *dst_mac_addr);
 
-bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc);
 
 void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
 
@@ -225,5 +224,11 @@ void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int sr
 
 char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 		char* message,int flag);
+
+int get_present_time();
+
+void set_route_entry_timeout(int timeout);
+
+int get_route_entry_timeout();
 
 #endif /* USP_H_ */
