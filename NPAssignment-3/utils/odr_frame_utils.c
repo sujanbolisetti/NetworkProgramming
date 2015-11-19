@@ -35,12 +35,12 @@ struct odr_hdr build_odr_payload_hdr(int rreq_id, char *src, int pkt_type, struc
 	struct odr_hdr hdr;
 
 	hdr = build_odr_hdr(src,msg->canonical_ipAddress,
-								ZERO_HOP_COUNT,pkt_type,INVALID_ENTRY,INVALID_ENTRY,msg->flag,R_REPLY_NOT_SENT);
+								ZERO_HOP_COUNT,pkt_type,INVALID_ENTRY,rreq_id,msg->flag,R_REPLY_NOT_SENT);
 
 	hdr.dest_port_num = msg->dest_port_num;
 	hdr.src_port_num = msg->src_port_num;
 	hdr.payload_len = strlen(msg->msg_received);
-	hdr.rreq_id = rreq_id;
+	// hdr.rreq_id = rreq_id;
 
 	return hdr;
 }
@@ -76,7 +76,6 @@ void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count){
 	strcpy(rrep_frame->hdr.cn_dsc_ipaddr,temp);
 
 	rrep_frame->hdr.pkt_type = R_REPLY;
-	//rrep_frame->hdr.force_route_dcvry = 0; // Force route discovery is only for R-REQ?
 	rrep_frame->hdr.hop_count = hop_count;
 }
 

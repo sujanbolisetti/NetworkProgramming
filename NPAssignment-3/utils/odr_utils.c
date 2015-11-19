@@ -377,14 +377,14 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 		// Generate R_REQ and then send R_RPLY
 		printf("No route entry exists. So starting R_REQ for R_RPLY\n");
 
-		frame->hdr.rreq_id = increment_rreq_id();
+		frame->hdr.rreq_id = get_new_rreq_id();
 		store_next_to_send_frame(frame);
 
 		struct odr_frame outg_frame;
 
 		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
 		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
-					ZERO_HOP_COUNT,R_REQ, increment_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
+					ZERO_HOP_COUNT,R_REQ, get_new_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
 
 		send_frame_rreq(pf_sockfd, -1, &outg_frame);
 	}
@@ -454,13 +454,13 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 			printf("Starting R_REQ for payload\n");
 		}
 
-		frame->hdr.rreq_id = increment_rreq_id();
+		frame->hdr.rreq_id = get_new_rreq_id();
 		store_next_to_send_frame(frame);
 
 		struct odr_frame outg_frame;
 		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
 		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
-					ZERO_HOP_COUNT, R_REQ, increment_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
+					ZERO_HOP_COUNT, R_REQ, get_new_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
 
 		send_frame_rreq(pf_sockfd, -1, &outg_frame);
 	}

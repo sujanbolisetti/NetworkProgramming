@@ -250,7 +250,7 @@ void convertToNetworkOrder(struct odr_hdr *hdr){
 void convertToHostOrder(struct odr_hdr *hdr){
 
 	if(DEBUG)
-		printf("came into host order conversion\n");
+		printf("came into host order conversion \n");
 
 	hdr->broadcast_id = ntohl(hdr->broadcast_id);
 	hdr->hop_count = ntohs(hdr->hop_count);

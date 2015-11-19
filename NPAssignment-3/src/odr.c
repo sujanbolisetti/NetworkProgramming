@@ -80,7 +80,7 @@ int main(){
 
 			struct odr_frame payload_frame;
 
-			payload_frame = build_payload_frame(increment_rreq_id(),my_ip_address,reply);
+			payload_frame = build_payload_frame(get_new_rreq_id(),my_ip_address,reply);
 
 			// have to exclude this even when force_route_discovery.
 			// have to implement retransmission for r_req
@@ -98,7 +98,7 @@ int main(){
 				store_next_to_send_frame(&payload_frame);
 
 				frame = build_odr_frame(my_ip_address,reply->canonical_ipAddress,
-						ZERO_HOP_COUNT,R_REQ, increment_broadcast_id(), payload_frame.hdr.rreq_id,reply->flag,R_REPLY_NOT_SENT,NULL,NULL);
+						ZERO_HOP_COUNT,R_REQ, get_new_broadcast_id(), payload_frame.hdr.rreq_id,reply->flag,R_REPLY_NOT_SENT,NULL,NULL);
 
 				if(DEBUG){
 						printf("broad_cast id %d  r_req id %d\n", r_req_id-1, broadcast_id-1);
@@ -129,14 +129,16 @@ int main(){
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
 			if(DEBUG)
-				printf("Before host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
+				printf("Before host conversion pkt_type : %d : r_req_id %d \n",received_frame->hdr.pkt_type,
+						received_frame->hdr.rreq_id);
 
 			convertToHostOrder(&(received_frame->hdr));
 
 			//update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 
 			if(DEBUG)
-				printf("After host conversion pkt_type : %d\n",received_frame->hdr.pkt_type);
+				printf("After host conversion pkt_type : %d : r_req_id %d \n",received_frame->hdr.pkt_type,
+						received_frame->hdr.rreq_id);
 
 			if(DEBUG)
 			{
@@ -264,12 +266,12 @@ void set_route_entry_timeout(long int timeout)
 	route_entry_timeout = timeout;
 }
 
-int increment_broadcast_id()
+int get_new_broadcast_id()
 {
 	return broadcast_id++;
 }
 
-int increment_rreq_id()
+int get_new_rreq_id()
 {
 	return r_req_id++;
 }

@@ -235,8 +235,8 @@ void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char 
 
 void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_mac_addr, int outg_inf_index);
 
-int increment_broadcast_id();
+int get_new_broadcast_id();
 
-int increment_rreq_id();
+int get_new_rreq_id();
 
 #endif /* USP_H_ */
