@@ -46,12 +46,12 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 	}
 }
 
-struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc){
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, int pkt_type){
 
 	printf("Entered get_routing_entry\n");
 
 	// if route entry timeout is 0
-	if(!get_route_entry_timeout() || force_dsc)
+	if(!get_route_entry_timeout() || (force_dsc && (pkt_type == R_REQ)))
 	{
 		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
 		return NULL;
@@ -83,10 +83,20 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc){
 	return NULL;
 }
 
-bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc){
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type){
 
 	printf("Entered updating routing table\n");
-	struct route_entry *rnode_entry = get_rentry_in_rtable(dest_ipaddress, force_dsc);
+
+	if(!get_route_entry_timeout()){
+		printf("Time out is zero hence not adding/updating the entry in the routing table\n");
+		return false;
+	}
+
+	/**
+	 * Sending force discovery as false because we are updating the routing entry here else
+	 * we will create duplicate entries for same destination.
+	 */
+	struct route_entry *rnode_entry = get_rentry_in_rtable(dest_ipaddress, false, pkt_type);
 
 	if(rnode_entry != NULL)
 	{
@@ -114,6 +124,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 	}
 	else
 	{
+
 		printf("Added new routing entry for destination ip-addr %s\n", dest_ipaddress);
 		if(DEBUG)
 		{

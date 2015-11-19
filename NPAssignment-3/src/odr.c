@@ -16,7 +16,7 @@ int broadcast_id = 0;
  */
 int r_req_id = 0;
 
-int main(){
+int main(int argc, char **argv){
 
 	int sockfd,pf_sockfd,maxfd;
 	struct sockaddr_un odr_addr;
@@ -30,6 +30,14 @@ int main(){
 	struct odr_frame frame;
 	char my_ip_address[20];
 	struct route_entry *rt;
+
+
+	if(argc < 2){
+		printf("Kindly enter the staleness parameter\n");
+		exit(0);
+	}else{
+		populate_staleness_parameter(argv[1]);
+	}
 
 	gethostname(my_name,sizeof(my_name));
 
@@ -59,7 +67,7 @@ int main(){
 
 	maxfd = max(sockfd,pf_sockfd)+1;
 
-	odr_init(inf_mac_addr_map, route_entry_timeout);
+	odr_init(inf_mac_addr_map);
 
 	for(;;){
 
@@ -84,7 +92,7 @@ int main(){
 
 			// have to exclude this even when force_route_discovery.
 			// have to implement retransmission for r_req
-			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress, reply->flag)) != NULL){
+			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress, reply->flag, PAY_LOAD)) != NULL){
 
 				send_frame_payload(pf_sockfd,&payload_frame,rt->next_hop_mac_address,rt->outg_inf_index);
 
@@ -175,14 +183,15 @@ int main(){
 					case R_REQ:
 						if(DEBUG)
 							printf("Received my R_REQ with id %d\n", received_frame->hdr.rreq_id);
-						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
-												received_frame,src_mac_addr,dest_mac_addr, true);
+//						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
+//												received_frame,src_mac_addr,dest_mac_addr, true);
+						send_frame_for_rreq(pf_sockfd, received_frame, src_mac_addr, addr_ll.sll_ifindex);
 						break;
 					case R_REPLY:
 						if(DEBUG)
 							printf("Received my R_RPLY destined to me\n");
-						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
-								received_frame->hdr.hop_count,addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
+//						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+//								received_frame->hdr.hop_count,addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
 //						frame_to_send =  get_next_send_packet(received_frame);
 //						send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, addr_ll.sll_ifindex);
 //						remove_data_payload(received_frame);
@@ -198,7 +207,7 @@ int main(){
 						// TODO : have to write proper code for payload sending to above uds process.
 
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
-								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
+								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
 
 						printf("Sending the message to the server/ client\n");
 						msg_send_to_uds(sockfd,received_frame->hdr.cn_src_ipaddr,received_frame->hdr.src_port_num,received_frame->hdr.dest_port_num,
@@ -227,7 +236,7 @@ int main(){
 				case PAY_LOAD:
 					printf("Received PAY_LOAD and forwarding same\n");
 					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
-							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry);
+							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
 					forward_frame_payload(pf_sockfd, received_frame);
 					break;
 				default:
@@ -263,6 +272,7 @@ int get_route_entry_timeout()
 void set_route_entry_timeout(long int timeout)
 {
 	route_entry_timeout = timeout;
+	printf("Staleness parameter set as %ld seconds\n", timeout);
 }
 
 int get_new_broadcast_id()
@@ -273,4 +283,18 @@ int get_new_broadcast_id()
 int get_new_rreq_id()
 {
 	return r_req_id++;
+}
+
+void populate_staleness_parameter(char *staleness_param)
+{
+
+	int timeout = atoi(staleness_param);
+
+	if(timeout < 0)
+	{
+		printf("Kindly enter postive staleness parameter\n");
+		exit(0);
+	}
+
+	set_route_entry_timeout(timeout);
 }

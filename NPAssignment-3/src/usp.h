@@ -123,7 +123,7 @@ struct odr_frame_node
 	struct odr_frame_node *next;
 };
 
-void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN], int timeout);
+void odr_init(char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN]);
 
 void msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag);
@@ -184,11 +184,11 @@ void build_eth_frame(void *buffer,char *dest_mac,
 void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 			struct odr_frame *received_frame,char *src_mac_addr,char *dst_mac_addr);
 
-bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc);
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type);
 
 void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
 
-struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc);
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, int pkt_type);
 
 void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count);
 
@@ -238,5 +238,9 @@ void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_m
 int get_new_broadcast_id();
 
 int get_new_rreq_id();
+
+void populate_staleness_parameter(char *staleness_param);
+
+void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* src_mac_addr,int received_inf_index);
 
 #endif /* USP_H_ */

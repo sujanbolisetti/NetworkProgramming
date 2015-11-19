@@ -7,7 +7,7 @@
 
 #include "usp.h"
 
-int main(){
+int main(int argc, char **argv){
 
 	int sockfd,tempsockfd;
 	struct sockaddr_un cli_addr,odr_addr;
@@ -18,10 +18,6 @@ int main(){
 	file_name[14] = '\0';
 	char my_name[128];
 	char server_vm_name[128];
-
-	//struct vm_info *head = populate_vminfo_structs();
-
-	//printf("vm_address :%s\n",head->vm_ipadress);
 
 	sockfd = socket(AF_LOCAL,SOCK_DGRAM,0);
 
