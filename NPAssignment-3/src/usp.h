@@ -87,7 +87,7 @@ struct route_entry{
 	char next_hop_mac_address[6];
 	int outg_inf_index;
 	int hop_count;
-	int time_stamp;
+	long int time_stamp;
 	struct route_entry *next;
 };
 
@@ -170,7 +170,7 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
 		int broadcast_id, int rreq_id, int frc_dsc,int rreply_sent);
 
-struct odr_hdr build_odr_payload_hdr(char *src, int pkt_type, struct msg_from_uds *msg);
+struct odr_hdr build_odr_payload_hdr(int rreq_id, char *src, int pkt_type, struct msg_from_uds *msg);
 
 struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type, int broadcast_id,
 			int rreq_id, int frc_dsc,int rreply_sent,char *pay_load,struct msg_from_uds *msg);
@@ -188,7 +188,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 
 void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
 
-struct route_entry* get_rentry_in_rtable(char *dest_ipAddress);
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc);
 
 void build_rreply_odr_frame(struct odr_frame *rrep_frame,int hop_count);
 
@@ -204,7 +204,7 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 
 void printHWADDR(char* src_mac_addr);
 
-bool remove_data_payload(struct odr_frame *frame);
+bool remove_frame(struct odr_frame *frame);
 
 struct odr_frame * get_next_send_packet(struct odr_frame *frame);
 
@@ -225,10 +225,18 @@ void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int sr
 char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 		char* message,int flag);
 
-int get_present_time();
+long int get_present_time();
 
-void set_route_entry_timeout(int timeout);
+void set_route_entry_timeout(long int timeout);
 
 int get_route_entry_timeout();
+
+void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char *src_mac_addr, int received_inf_index);
+
+void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_mac_addr, int outg_inf_index);
+
+int increment_broadcast_id();
+
+int increment_rreq_id();
 
 #endif /* USP_H_ */

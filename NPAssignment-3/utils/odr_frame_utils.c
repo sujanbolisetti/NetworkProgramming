@@ -30,7 +30,7 @@ struct odr_hdr build_odr_hdr(char *src,char *dst,int hop_count,int pkt_type,
 /**
  * Method build a payload frame
  */
-struct odr_hdr build_odr_payload_hdr(char *src, int pkt_type, struct msg_from_uds *msg){
+struct odr_hdr build_odr_payload_hdr(int rreq_id, char *src, int pkt_type, struct msg_from_uds *msg){
 
 	struct odr_hdr hdr;
 
@@ -40,7 +40,7 @@ struct odr_hdr build_odr_payload_hdr(char *src, int pkt_type, struct msg_from_ud
 	hdr.dest_port_num = msg->dest_port_num;
 	hdr.src_port_num = msg->src_port_num;
 	hdr.payload_len = strlen(msg->msg_received);
-	hdr.rreq_id = INVALID_ENTRY;
+	hdr.rreq_id = rreq_id;
 
 	return hdr;
 }
@@ -55,7 +55,7 @@ struct odr_frame build_odr_frame(char *src,char *dst,int hop_count,int pkt_type,
 		struct odr_frame frame;
 
 		if(pkt_type == PAY_LOAD && pay_load != NULL){
-			frame.hdr = build_odr_payload_hdr(src,pkt_type,msg);
+			frame.hdr = build_odr_payload_hdr(rreq_id,src,pkt_type,msg);
 			strcpy(frame.payload,pay_load);
 		}else{ // for rreply and rreq's
 			frame.hdr = build_odr_hdr(src,dst,hop_count,pkt_type, broadcast_id, rreq_id,frc_dsc,rreply_sent);

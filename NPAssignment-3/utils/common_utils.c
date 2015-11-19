@@ -22,54 +22,6 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 					char* message,int flag){
 
 	char* msg_odr = build_msg_odr(sockfd, destIpAddress, destPortNumber, message, flag);
-//	= malloc(sizeof(char)*1024);
-//
-//	char *temp = msg_odr;
-//
-//	int length=0;
-//	char temp_str[120];
-//
-//	printf("%s\n",destIpAddress);
-//
-//	strcpy(msg_odr,destIpAddress);
-//
-//	sprintf(temp_str,"%d",destPortNumber);
-//
-//	printf("%s\n",temp_str);
-//
-//	length = strlen(destIpAddress);
-//
-//	msg_odr[length] = '$';
-//
-//	strcpy(msg_odr+length+1,temp_str);
-//
-//	length += strlen(temp_str);
-//
-//	msg_odr[length] = '$';
-//
-//	strcpy(msg_odr+length+1,message);
-//
-//	printf("%s\n",message);
-//
-//	if(strlen(message)){
-//		length+=strlen(message);
-//	}else{
-//		length+=1;
-//	}
-//
-//	msg_odr[length] = '$';
-//
-//	memset(temp_str,'\0',sizeof(temp_str));
-//
-//	sprintf(temp_str,"%d",flag);
-//
-//	printf("%s\n",temp_str);
-//
-//	strcpy(msg_odr+length+1,temp_str);
-//
-//	printf("length %d\n",length);
-//	printf("complete string %s\n",temp);
-
 
 	if(write(sockfd,msg_odr,strlen(msg_odr)) <  0){
 		printf("write failed with error :%s\n",strerror(errno));

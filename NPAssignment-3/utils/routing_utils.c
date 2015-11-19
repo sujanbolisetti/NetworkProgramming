@@ -10,7 +10,7 @@
 struct route_entry *rtable_head = NULL;
 struct route_entry *rtable_tail = NULL;
 
-int get_present_time()
+long int get_present_time()
 {
 	return time(NULL);
 }
@@ -46,13 +46,14 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 	}
 }
 
-struct route_entry* get_rentry_in_rtable(char *dest_ipAddress){
+struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc){
 
 	printf("Entered get_routing_entry\n");
 
 	// if route entry timeout is 0
-	if(!get_route_entry_timeout())
+	if(!get_route_entry_timeout() || force_dsc)
 	{
+		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
 		return NULL;
 	}
 
@@ -85,7 +86,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress){
 bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc){
 
 	printf("Entered updating routing table\n");
-	struct route_entry *rnode_entry = get_rentry_in_rtable(dest_ipaddress);
+	struct route_entry *rnode_entry = get_rentry_in_rtable(dest_ipaddress, force_dsc);
 
 	if(rnode_entry != NULL)
 	{
@@ -137,7 +138,7 @@ void printRoutingTable(struct route_entry* head)
 		printf("Next Hop");
 		printHWADDR(temp->next_hop_mac_address);
 		printf("Interface index: %d\t",temp->outg_inf_index);
-		printf("Time stamp: %d\t", temp->time_stamp);
+		printf("Time stamp: %ld\t", temp->time_stamp);
 		printf("\n");
 		temp = temp -> next;
 	}

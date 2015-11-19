@@ -136,10 +136,13 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	struct route_entry *rt;
 	int result = -1;
 
+	printf("Before function call\n");
 	result =  is_inefficient_frame_exists(received_frame);
+	printf("R_REQ status %d\n", result);
 
 	if(result == EFFICIENT_FRAME_EXISTS){
-			return;
+		printf("Efficient R_REQ already sent so no action\n");
+		return;
 	}
 
 	/**
@@ -148,17 +151,20 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	 *  and sender ip address.
 	 */
 	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
-
-		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr)) != NULL && !received_frame->hdr.force_route_dcvry){
+		printf("R_REQ status %d. Starting R_REQ\n", result);
+		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr, received_frame->hdr.force_route_dcvry)) != NULL && !received_frame->hdr.force_route_dcvry){
+			printf("Routing entry exists for dest ip addr %s", received_frame->hdr.cn_dsc_ipaddr);
 			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
 			if(update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
 					org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry)){
+				printf("Updated routing table\n");
 				org_received_frame.hdr.rreply_sent = 1;
 				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
 			}
 		}else{
 
 			if(result == FRAME_NOT_EXISTS){
+				printf("R_REQ frame not exists. Starting R_REQ\n");
 				store_rreq_frame(received_frame);
 			}
 
@@ -308,11 +314,13 @@ int is_inefficient_frame_exists(struct odr_frame *frame)
 				return EFFICIENT_FRAME_EXISTS;
 			}
 		}
+		temp = temp->next;
 	}
+
 	return FRAME_NOT_EXISTS;
 }
 
-void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
+void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 			int hop_count,bool is_belongs_to_me)
 {
 
@@ -342,7 +350,7 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
 
 	if(DEBUG)
 		printf("Dest address %s\n",dst_addr);
-	if((rt = get_rentry_in_rtable(dst_addr)) != NULL){
+	if((rt = get_rentry_in_rtable(dst_addr, frame->hdr.force_route_dcvry)) != NULL){
 
 		char src_mac_addr[ETH_ALEN];
 
@@ -362,12 +370,23 @@ void send_frame_rreply(int pf_sockid, struct odr_frame *frame,
 		if(DEBUG)
 			printf("built frame\n");
 
-		Sendto(pf_sockid, buffer, addr_ll, "R_RPLY");
+		Sendto(pf_sockfd, buffer, addr_ll, "R_RPLY");
 	}
 	else
 	{
 		// Generate R_REQ and then send R_RPLY
-		printf("Wierd no entry exists\n");
+		printf("No route entry exists. So starting R_REQ for R_RPLY\n");
+
+		frame->hdr.rreq_id = increment_rreq_id();
+		store_next_to_send_frame(frame);
+
+		struct odr_frame outg_frame;
+
+		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
+		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
+					ZERO_HOP_COUNT,R_REQ, increment_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
+
+		send_frame_rreq(pf_sockfd, -1, &outg_frame);
 	}
 }
 
@@ -421,7 +440,7 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 {
 	struct route_entry* rt;
-	if((rt = get_rentry_in_rtable(frame->hdr.cn_dsc_ipaddr)) != NULL)
+	if((rt = get_rentry_in_rtable(frame->hdr.cn_dsc_ipaddr, frame->hdr.force_route_dcvry)) != NULL)
 	{
 		if(DEBUG)
 			printf("Found route entry to forward payload for dest ip addr %s\n", frame->hdr.cn_dsc_ipaddr);
@@ -430,7 +449,20 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 	else
 	{
 		if(DEBUG)
+		{
 			printf("No route exist in routing table for dest ip address %s\n", frame->hdr.cn_dsc_ipaddr);
+			printf("Starting R_REQ for payload\n");
+		}
+
+		frame->hdr.rreq_id = increment_rreq_id();
+		store_next_to_send_frame(frame);
+
+		struct odr_frame outg_frame;
+		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
+		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
+					ZERO_HOP_COUNT, R_REQ, increment_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
+
+		send_frame_rreq(pf_sockfd, -1, &outg_frame);
 	}
 }
 
@@ -444,22 +476,27 @@ struct odr_frame * get_next_send_packet(struct odr_frame *frame){
 	while(temp != NULL){
 
 		if(DEBUG)
-			printf("retrieving the payload frame with rreq id : %d\n",temp->frame.hdr.rreq_id);
+				printf("retrieving the payload/ r_reply %d frame with rreq id : %d ?= %d\n", frame->hdr.pkt_type,
+						temp->frame.hdr.rreq_id, frame->hdr.rreq_id);
+
+		printf("temp frame.hdr.cn_dsc_ipaddr %s ?= ",temp->frame.hdr.cn_dsc_ipaddr);
+		printf("frame hdr.cn_src_ipaddr %s\n ",frame->hdr.cn_src_ipaddr);
 
 		if(temp->frame.hdr.rreq_id == frame->hdr.rreq_id
-				&& !strcmp(temp-> frame.hdr.cn_src_ipaddr,frame->hdr.cn_dsc_ipaddr)){
+				&& !strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr)){
 
 			if(DEBUG)
-				printf("retrieving the payload frame with rreq id : %d\n", temp->frame.hdr.rreq_id);
+				printf("retrieving the payload frame with rreq id and found matching rreq_id : %d\n", temp->frame.hdr.rreq_id);
 
 			temp->frame.hdr.force_route_dcvry = 0;
 			return &(temp->frame);
 		}
+		temp = temp->next;
 	}
 	return NULL;
 }
 
-bool remove_data_payload(struct odr_frame *frame)
+bool remove_frame(struct odr_frame *frame)
 {
 	struct odr_frame_node *temp = next_to_list_head;
 
@@ -472,7 +509,7 @@ bool remove_data_payload(struct odr_frame *frame)
 		next_to_list_head = next_to_list_head -> next;
 
 		if(DEBUG)
-			printf("retrieving the payload frame with rreq id : %d\n",temp->frame.hdr.rreq_id);
+			printf("retrieving the payload frame with rreq id in removing the head : %d\n",temp->frame.hdr.rreq_id);
 
 		free(temp);
 		return true;
@@ -487,7 +524,7 @@ bool remove_data_payload(struct odr_frame *frame)
 		{
 
 			if(DEBUG)
-				printf("retrieving the payload frame with rreq id : %d\n",temp->frame.hdr.rreq_id);
+				printf("retrieving the payload frame with rreq id in removing after head : %d\n",temp->frame.hdr.rreq_id);
 
 			if(next_to_list_rear == temp)
 			{
@@ -503,4 +540,35 @@ bool remove_data_payload(struct odr_frame *frame)
 		temp = temp -> next;
 	}
 	return false;
+}
+
+void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char *src_mac_addr, int received_inf_index)
+{
+	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+									received_frame->hdr.hop_count, received_inf_index, received_frame->hdr.force_route_dcvry);
+
+	struct odr_frame* frame_to_send =  get_next_send_packet(received_frame);
+
+	if(frame_to_send->hdr.pkt_type == R_REPLY)
+	{
+		printf("Got a next frame to send R_RPLY\n");
+		send_rrply_to_next_hop(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
+	}
+	else if(frame_to_send->hdr.pkt_type == PAY_LOAD)
+	{
+		printf("Got a next frame to send PAY_LOAD\n");
+		send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
+	}
+	remove_frame(received_frame);
+}
+
+void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_mac_addr, int outg_inf_index)
+{
+	printf("Sending packet to next hop because of no route entry in routing table %s\n", dest_mac_addr);
+	struct sockaddr_ll addr_ll;
+	memset(buffer, '\0', sizeof(buffer));
+	build_eth_frame(buffer, dest_mac_addr, get_inf_mac_addr(outg_inf_index),
+			outg_inf_index, &addr_ll, frame, PACKET_OTHERHOST);
+
+	Sendto(pf_sockfd, buffer, addr_ll, "R_REPLY");
 }

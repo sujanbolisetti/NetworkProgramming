@@ -75,7 +75,7 @@ int main(){
 
 		printf("client node at %s sending the request to server at %s\n",my_name,server_vm_name);
 
-		msg_send(sockfd,Gethostbyname(server_vm_name),SERVER_PORT,"Get the current time",0);
+		msg_send(sockfd,Gethostbyname(server_vm_name),SERVER_PORT,"Get the current time",1);
 
 		struct msg_from_uds *msg = msg_receive(sockfd);
 
