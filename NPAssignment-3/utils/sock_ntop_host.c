@@ -2,14 +2,7 @@
  * sock_ntop_host.c
  *
  *  Created on: Nov 9, 2015
- *      Author: sujan
- */
-
-/*
- * sock_ntop_host.c
- *
- *  Created on: Oct 5, 2015
- *       Authors: sujan, sidhartha
+ *      Author: sujan, siddhu
  */
 
 #include	"../src/usp.h"
