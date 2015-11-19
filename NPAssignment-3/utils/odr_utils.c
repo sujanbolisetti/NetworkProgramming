@@ -151,20 +151,21 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	 *  and sender ip address.
 	 */
 	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
-		printf("R_REQ status %d. Starting R_REQ\n", result);
+		printf("R_REQ status %d. Forwarding R_REQ\n", result);
 		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr, received_frame->hdr.force_route_dcvry)) != NULL && !received_frame->hdr.force_route_dcvry){
 			printf("Routing entry exists for dest ip addr %s", received_frame->hdr.cn_dsc_ipaddr);
+			bool route_updated = update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
+								org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry);
 			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
-			if(update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
-					org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry)){
+			if(route_updated){
 				printf("Updated routing table\n");
-				org_received_frame.hdr.rreply_sent = 1;
+				org_received_frame.hdr.rreply_sent = R_REPLY_SENT;
 				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
 			}
 		}else{
 
 			if(result == FRAME_NOT_EXISTS){
-				printf("R_REQ frame not exists. Starting R_REQ\n");
+				printf("R_REQ frame not exists. Forwarding R_REQ in route not exist\n");
 				store_rreq_frame(received_frame);
 			}
 
@@ -349,7 +350,7 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 	}
 
 	if(DEBUG)
-		printf("Dest address %s\n",dst_addr);
+		printf("Dest address in send_fram_rrepy %s\n",dst_addr);
 	if((rt = get_rentry_in_rtable(dst_addr, frame->hdr.force_route_dcvry)) != NULL){
 
 		char src_mac_addr[ETH_ALEN];
@@ -382,7 +383,7 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 
 		struct odr_frame outg_frame;
 
-		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
+		printf("Sending R_REQ and my ip addr %s\n", Gethostbyname(Gethostname()));
 		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
 					ZERO_HOP_COUNT,R_REQ, get_new_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
 
@@ -504,7 +505,7 @@ bool remove_frame(struct odr_frame *frame)
 		return false;
 
 	if(temp->frame.hdr.rreq_id == frame->hdr.rreq_id
-					&& !strcmp(temp-> frame.hdr.cn_src_ipaddr,frame->hdr.cn_dsc_ipaddr))
+					&& !strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr))
 	{
 		next_to_list_head = next_to_list_head -> next;
 

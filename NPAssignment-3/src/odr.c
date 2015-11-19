@@ -129,16 +129,15 @@ int main(){
 			struct odr_frame *received_frame  = (struct odr_frame *)(buffer + ETH_HDR_LEN);
 
 			if(DEBUG)
-				printf("Before host conversion pkt_type : %d : r_req_id %d \n",received_frame->hdr.pkt_type,
-						received_frame->hdr.rreq_id);
+				printf("Before host conversion odr pkt_type and r_reqqId: %d : %d\n",received_frame->hdr.pkt_type,received_frame->hdr.rreq_id);
 
 			convertToHostOrder(&(received_frame->hdr));
 
 			//update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
 
 			if(DEBUG)
-				printf("After host conversion pkt_type : %d : r_req_id %d \n",received_frame->hdr.pkt_type,
-						received_frame->hdr.rreq_id);
+				printf("After host conversion odr pkt_type and r_reqid : %d : %d\n",received_frame->hdr.pkt_type,received_frame->hdr.rreq_id);
+
 
 			if(DEBUG)
 			{
@@ -151,11 +150,11 @@ int main(){
 			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
 			{
 				memcpy((void *)dest_mac_addr,(void *)inf_mac_addr_map[addr_ll.sll_ifindex],ETH_ALEN);
-				printf("After updating dest addr for broadcast packet %d\n",addr_ll.sll_ifindex);
+				printf("After updating dest addr for broadcast packet the interface index: %d\n",addr_ll.sll_ifindex);
 				printHWADDR(dest_mac_addr);
 			}
 
-			printf("Packet type from sockaddr_ll %d\n", addr_ll.sll_pkttype);
+			printf("Packet type (Broadcast/otherhost) from sockaddr_ll %d\n", addr_ll.sll_pkttype);
 
 			if(DEBUG)
 				printf("Packet destined ip-address %s\n", received_frame->hdr.cn_dsc_ipaddr);
@@ -216,7 +215,7 @@ int main(){
 				switch(received_frame->hdr.pkt_type){
 
 				case R_REQ:
-					printf("Received R_REQ and forwarding same\n");
+					printf("Received R_REQ and processing to see whether a route exist else forwarding\n");
 					process_received_rreq_frame(pf_sockfd,addr_ll.sll_ifindex,
 															received_frame,src_mac_addr,dest_mac_addr);
 					break;
