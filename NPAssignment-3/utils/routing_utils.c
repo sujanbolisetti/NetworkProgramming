@@ -53,7 +53,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 	printf("Entered get_routing_entry\n");
 
 	// if route entry timeout is 0
-	if(!get_route_entry_timeout() || (force_dsc && (pkt_type == R_REQ)))
+	if(!get_route_entry_timeout() || (force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
 		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
 		return NULL;

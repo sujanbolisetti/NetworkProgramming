@@ -571,38 +571,40 @@ bool remove_frame(struct odr_frame *frame)
 
 void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char *src_mac_addr, int received_inf_index)
 {
-	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+	bool route_updated = update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
 									received_frame->hdr.hop_count, received_inf_index, received_frame->hdr.force_route_dcvry,
 									received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
-	struct odr_frame* frame_to_send =  get_next_send_packet(received_frame);
+	struct odr_frame* frame_to_send;
 
-	if(frame_to_send == NULL){
+	printf("Entered into the send_frame_for_rrply\n");
 
-		if(DEBUG){
-			printf("The Next frame to send is NULL");
+	while((frame_to_send =  get_next_send_packet(received_frame)) != NULL)
+	{
+		if(frame_to_send->hdr.pkt_type == R_REPLY)
+		{
+			printf("Got a next frame to send R_RPLY\n");
+			if(route_updated || !get_route_entry_timeout())
+			{
+				send_rrply_to_next_hop(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
+			}
 		}
-		return;
+		else if(frame_to_send->hdr.pkt_type == PAY_LOAD)
+		{
+			printf("Got a next frame to send PAY_LOAD\n");
+			send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
+		}
+		remove_frame(received_frame);
 	}
-
-	if(frame_to_send->hdr.pkt_type == R_REPLY)
-	{
-		printf("Got a next frame to send R_RPLY\n");
-		send_rrply_to_next_hop(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
-	}
-	else if(frame_to_send->hdr.pkt_type == PAY_LOAD)
-	{
-		printf("Got a next frame to send PAY_LOAD\n");
-		send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
-	}
-	remove_frame(received_frame);
-
 }
 
 void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_mac_addr, int outg_inf_index)
 {
-	printf("Sending packet to next hop because of no route entry in routing table %s\n", dest_mac_addr);
+	printf("Sending packet to next hop because of no route entry in routing table ");
+	printHWADDR(dest_mac_addr);
+
 	struct sockaddr_ll addr_ll;
+
 	memset(buffer, '\0', sizeof(buffer));
 	build_eth_frame(buffer, dest_mac_addr, get_inf_mac_addr(outg_inf_index),
 			outg_inf_index, &addr_ll, frame, PACKET_OTHERHOST);
@@ -612,15 +614,19 @@ void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_m
 
 void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* src_mac_addr,int received_inf_index){
 
-	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+	bool route_updated = update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
 							received_frame->hdr.hop_count,received_inf_index, received_frame->hdr.force_route_dcvry,
 							received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
-	printf("Received a rreq destined to me hence sending rreply to next-hop\n");
 
-	build_rreply_odr_frame(received_frame, ZERO_HOP_COUNT);
+	if(route_updated || !get_route_entry_timeout())
+	{
+		printf("Received a rreq destined to me hence sending rreply to next-hop\n");
 
-	send_rrply_to_next_hop(pf_sockfd,received_frame,src_mac_addr,received_inf_index);
+		build_rreply_odr_frame(received_frame, ZERO_HOP_COUNT);
+
+		send_rrply_to_next_hop(pf_sockfd,received_frame,src_mac_addr,received_inf_index);
+	}
 }
 
 
