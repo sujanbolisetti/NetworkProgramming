@@ -247,4 +247,6 @@ void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* sr
 
 void remove_route_entry(struct route_entry *rt);
 
+struct timeval get_time_interval(int secs);
+
 #endif /* USP_H_ */
