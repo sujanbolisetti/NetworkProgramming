@@ -73,8 +73,6 @@ int main(int argc, char **argv){
 			printf("scanf failed with error:%s\n",strerror(errno));
 		}
 
-		t = get_time_interval(timeout);
-
 		int force_dsc = 0;
 
 		int i = 0;
@@ -92,9 +90,10 @@ int main(int argc, char **argv){
 			}
 			else
 			{
-				printf("Time request sent again to server with force discovery : %s", server_vm_name);
+				printf("Time request sent again to server with force discovery : %s\n", server_vm_name);
 			}
 
+			t = get_time_interval(timeout);
 			select(sockfd + 1, &monitor_fds, NULL, NULL, &t);
 
 			if(FD_ISSET(sockfd, &monitor_fds)){
