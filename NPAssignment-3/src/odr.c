@@ -207,7 +207,7 @@ int main(int argc, char **argv){
 						// TODO : have to write proper code for payload sending to above uds process.
 
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
-								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
+								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
 						printf("Sending the message to the server/ client\n");
 						msg_send_to_uds(sockfd,received_frame->hdr.cn_src_ipaddr,received_frame->hdr.src_port_num,received_frame->hdr.dest_port_num,
@@ -236,7 +236,7 @@ int main(int argc, char **argv){
 				case PAY_LOAD:
 					printf("Received PAY_LOAD and forwarding same\n");
 					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
-							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
+							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 					forward_frame_payload(pf_sockfd, received_frame);
 					break;
 				default:
@@ -277,6 +277,7 @@ void set_route_entry_timeout(long int timeout)
 
 int get_new_broadcast_id()
 {
+	printf("Getting the broadcast Id :%d\n",broadcast_id);
 	return broadcast_id++;
 }
 

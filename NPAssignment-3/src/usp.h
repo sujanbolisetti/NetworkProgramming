@@ -88,6 +88,7 @@ struct route_entry{
 	int outg_inf_index;
 	int hop_count;
 	long int time_stamp;
+	int broadcast_id;
 	struct route_entry *next;
 };
 
@@ -184,9 +185,10 @@ void build_eth_frame(void *buffer,char *dest_mac,
 void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 			struct odr_frame *received_frame,char *src_mac_addr,char *dst_mac_addr);
 
-bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type);
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type,int broadcastid);
 
-void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index);
+void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index,
+		int broadcastid);
 
 struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, int pkt_type);
 
@@ -242,5 +244,7 @@ int get_new_rreq_id();
 void populate_staleness_parameter(char *staleness_param);
 
 void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* src_mac_addr,int received_inf_index);
+
+void remove_route_entry(struct route_entry *rt);
 
 #endif /* USP_H_ */

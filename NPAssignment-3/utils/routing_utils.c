@@ -15,7 +15,8 @@ long int get_present_time()
 	return time(NULL);
 }
 
-void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index){
+void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index,
+		int broadcastid){
 
 	struct route_entry *r_node = (struct route_entry*)malloc(sizeof(struct route_entry));
 
@@ -34,6 +35,7 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 	// TODO : have to populate the time_out
 	r_node->outg_inf_index = outg_inf_index;
 	r_node->time_stamp = get_present_time();
+	r_node->broadcast_id = broadcastid;
 
 	r_node->next = NULL;
 
@@ -73,6 +75,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 			else
 			{
 				printf("Found stale route entry for destination ip-addr %s\n", dest_ipAddress);
+				remove_route_entry(temp_rnode);
 				return NULL;
 			}
 		}
@@ -83,7 +86,8 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 	return NULL;
 }
 
-bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type){
+bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type,
+			int broadcast_id){
 
 	printf("Entered updating routing table\n");
 
@@ -101,24 +105,33 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 	if(rnode_entry != NULL)
 	{
 		printf("Updating routing table\n");
-		if(hop_count < rnode_entry->hop_count || force_dsc)
-		{
-			rnode_entry->hop_count = hop_count;
-			rnode_entry->outg_inf_index = outg_inf_index;
-			rnode_entry->time_stamp = get_present_time();
-			memcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr,ETH_ALEN);
-			printRoutingTable(rtable_head);
 
-			if(force_dsc)
-				printf("Updated routing entry for destination ip-addr %s because of force route discovery\n", dest_ipaddress);
+		if(broadcast_id >= rnode_entry -> broadcast_id  || force_dsc){
+
+			if((broadcast_id > rnode_entry -> broadcast_id) ||
+					(broadcast_id == rnode_entry -> broadcast_id && hop_count < rnode_entry->hop_count) ||
+					force_dsc)
+			{
+				rnode_entry->hop_count = hop_count;
+				rnode_entry->outg_inf_index = outg_inf_index;
+				rnode_entry->time_stamp = get_present_time();
+				memcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr,ETH_ALEN);
+				printRoutingTable(rtable_head);
+
+				if(force_dsc)
+					printf("Updated routing entry for destination ip-addr %s because of force route discovery\n", dest_ipaddress);
+				else
+					printf("Updated routing entry for destination ip-addr %s because of better route found\n", dest_ipaddress);
+
+				return true;
+			}
 			else
-				printf("Updated routing entry for destination ip-addr %s because of better route found\n", dest_ipaddress);
-
-			return true;
-		}
-		else
-		{
-			printRoutingTable(rtable_head);
+			{
+				printRoutingTable(rtable_head);
+				return false;
+			}
+		}else{
+			printf("Received a rreq/reply with lower broadcastid / less efficient route hence not updating the routing table\n");
 			return false;
 		}
 	}
@@ -132,11 +145,45 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 			printHWADDR(next_hp_mac_addr);
 		}
 
-		add_entry_in_rtable(dest_ipaddress, next_hp_mac_addr, hop_count, outg_inf_index);
+		add_entry_in_rtable(dest_ipaddress, next_hp_mac_addr, hop_count, outg_inf_index,broadcast_id);
 		printRoutingTable(rtable_head);
 		return true;
 	}
 }
+
+void remove_route_entry(struct route_entry *rt){
+
+	struct route_entry *temp = rtable_head;
+
+		if(rtable_head == NULL)
+			return;
+
+		if(!strcmp(temp->dest_canonical_ipAddress,rt->dest_canonical_ipAddress))
+		{
+			rtable_head = rtable_head -> next;
+			free(temp);
+			return;
+		}
+
+		struct route_entry *prev = temp;
+		temp = temp -> next;
+		while(temp != NULL)
+		{
+			if(!strcmp(temp->dest_canonical_ipAddress,rt->dest_canonical_ipAddress))
+			{
+				if(rtable_tail == temp)
+				{
+					rtable_tail = prev;
+				}
+				prev -> next = temp -> next;
+				free(temp);
+				return;
+			}
+			prev = temp;
+			temp = temp -> next;
+		}
+}
+
 
 void printRoutingTable(struct route_entry* head)
 {

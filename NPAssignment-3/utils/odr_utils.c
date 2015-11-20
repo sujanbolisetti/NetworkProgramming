@@ -103,9 +103,9 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 void process_received_rreply_frame(int pf_sockid,int received_inf_ind,struct odr_frame *received_frame,
 		char *src_mac_addr, char* dst_mac_addr, bool is_belongs_to_me){
 
-	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
-			received_frame->hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
-	if(remove_rreq_frame(received_frame) || is_belongs_to_me)
+	bool route_updated = update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
+			received_frame->hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
+	if(route_updated || is_belongs_to_me)
 	{
 		send_frame_rreply(pf_sockid, received_frame, INVALID_HOP_COUNT, is_belongs_to_me);
 	}
@@ -138,46 +138,73 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 	struct route_entry *rt;
 	int result = -1;
 
-	printf("Before function call\n");
-	result =  is_inefficient_frame_exists(received_frame);
-	printf("R_REQ status %d\n", result);
+	//printf("Before function call\n");
+	//result =  is_inefficient_frame_exists(received_frame);
+	//printf("R_REQ status %d\n", result);
 
-	if(result == EFFICIENT_FRAME_EXISTS){
-		printf("Efficient R_REQ already sent so no action\n");
-		return;
-	}
+	bool route_updated = update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
+									org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry,
+									received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
-	/**
-	 *  We will forward the frame only in case if the rreq was new/
-	 *  its a better rreq than the currently saved rreq for the brodcast-id
-	 *  and sender ip address.
-	 */
-	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
-		printf("R_REQ status %d. Forwarding R_REQ\n", result);
-		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr, received_frame->hdr.force_route_dcvry,
-				received_frame->hdr.pkt_type)) != NULL){
-			printf("Routing entry exists for dest ip addr %s", received_frame->hdr.cn_dsc_ipaddr);
-			bool route_updated = update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
-								org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
+	if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr, received_frame->hdr.force_route_dcvry,
+							received_frame->hdr.pkt_type)) != NULL){
+
+		printf("Routing entery for destination exists. Hence sending a r-reply\n");
+		if(!received_frame->hdr.rreply_sent){
+			printf("Received a packet with R_reply sent flag hence not sending a r_reply\n");
 			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
-			if(route_updated){
-				printf("Updated routing table\n");
-				org_received_frame.hdr.rreply_sent = R_REPLY_SENT;
-				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
-			}
-		}else{
-
-			if(result == FRAME_NOT_EXISTS){
-				printf("R_REQ frame not exists. Forwarding R_REQ in route not exist\n");
-				store_rreq_frame(received_frame);
-			}
-
-			update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count,
-					received_inf_ind, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
-			send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
 		}
+
+		if(route_updated){
+			printf("Updated routing table\n");
+			org_received_frame.hdr.rreply_sent = R_REPLY_SENT;
+			send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
+		}
+	}else{
+
+		printf("No Route for the destination hence forwarding the r_req_packet\n");
+		send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
 	}
 }
+
+
+//	if(result == EFFICIENT_FRAME_EXISTS){
+//		printf("Efficient R_REQ already sent so no action\n");
+//		return;
+//	}
+//
+//	/**
+//	 *  We will forward the frame only in case if the rreq was new/
+//	 *  its a better rreq than the currently saved rreq for the brodcast-id
+//	 *  and sender ip address.
+//	 */
+//	if(result == FRAME_NOT_EXISTS || result == INEFFICIENT_FRAME_EXISTS){
+//		printf("R_REQ status %d. Forwarding R_REQ\n", result);
+//		if((rt = get_rentry_in_rtable(received_frame->hdr.cn_dsc_ipaddr, received_frame->hdr.force_route_dcvry,
+//				received_frame->hdr.pkt_type)) != NULL){
+//			printf("Routing entry exists for dest ip addr %s", received_frame->hdr.cn_dsc_ipaddr);
+//			bool route_updated = update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr,
+//								org_received_frame.hdr.hop_count, received_inf_ind, received_frame->hdr.force_route_dcvry,
+//								received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
+//			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
+//			if(route_updated){
+//				printf("Updated routing table\n");
+//				org_received_frame.hdr.rreply_sent = R_REPLY_SENT;
+//				send_frame_rreq(pf_sockid, received_inf_ind, &org_received_frame);
+//			}
+//		}else{
+//
+//			if(result == FRAME_NOT_EXISTS){
+//				printf("R_REQ frame not exists. Forwarding R_REQ in route not exist\n");
+//				store_rreq_frame(received_frame);
+//			}
+//
+//			update_routing_table(org_received_frame.hdr.cn_src_ipaddr, src_mac_addr, org_received_frame.hdr.hop_count,
+//					received_inf_ind, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
+//			send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
+//		}
+//	}
+
 
 /**
  *  This function returns the pf_sock_ids array
@@ -219,11 +246,6 @@ int* bindInterfaces(int *inf_sockid_map){
 		i++;
 	}
 	return inf_sockfds;
-}
-
-
-bool is_route_exists(char *canonical_ipAddress){
-	return false;
 }
 
 
@@ -550,9 +572,18 @@ bool remove_frame(struct odr_frame *frame)
 void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char *src_mac_addr, int received_inf_index)
 {
 	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
-									received_frame->hdr.hop_count, received_inf_index, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
+									received_frame->hdr.hop_count, received_inf_index, received_frame->hdr.force_route_dcvry,
+									received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
 	struct odr_frame* frame_to_send =  get_next_send_packet(received_frame);
+
+	if(frame_to_send == NULL){
+
+		if(DEBUG){
+			printf("The Next frame to send is NULL");
+		}
+		return;
+	}
 
 	if(frame_to_send->hdr.pkt_type == R_REPLY)
 	{
@@ -565,6 +596,7 @@ void send_frame_for_rrply(int pf_sockfd, struct odr_frame *received_frame, char 
 		send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, received_inf_index);
 	}
 	remove_frame(received_frame);
+
 }
 
 void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_mac_addr, int outg_inf_index)
@@ -581,7 +613,8 @@ void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_m
 void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* src_mac_addr,int received_inf_index){
 
 	update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
-							received_frame->hdr.hop_count,received_inf_index, received_frame->hdr.force_route_dcvry,received_frame->hdr.pkt_type);
+							received_frame->hdr.hop_count,received_inf_index, received_frame->hdr.force_route_dcvry,
+							received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
 	printf("Received a rreq destined to me hence sending rreply to next-hop\n");
 
