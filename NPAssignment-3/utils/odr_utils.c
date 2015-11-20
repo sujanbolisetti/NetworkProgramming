@@ -487,8 +487,8 @@ struct odr_frame * get_next_send_packet(struct odr_frame *frame){
 		printf("temp frame.hdr.cn_dsc_ipaddr %s ?= ",temp->frame.hdr.cn_dsc_ipaddr);
 		printf("frame hdr.cn_src_ipaddr %s\n ",frame->hdr.cn_src_ipaddr);
 
-		if(temp->frame.hdr.rreq_id == frame->hdr.rreq_id
-				&& !strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr)){
+		//temp->frame.hdr.rreq_id == frame->hdr.rreq_id&&
+		if(!strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr)){
 
 			if(DEBUG)
 				printf("retrieving the payload frame with rreq id and found matching rreq_id : %d\n", temp->frame.hdr.rreq_id);
@@ -508,8 +508,8 @@ bool remove_frame(struct odr_frame *frame)
 	if(next_to_list_head == NULL)
 		return false;
 
-	if(temp->frame.hdr.rreq_id == frame->hdr.rreq_id
-					&& !strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr))
+	// temp->frame.hdr.rreq_id == frame->hdr.rreq_id
+	if(!strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr))
 	{
 		next_to_list_head = next_to_list_head -> next;
 
