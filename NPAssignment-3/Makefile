@@ -34,7 +34,7 @@ common_utils.o: utils/common_utils.c
 get_hw_addrs.o: src/get_hw_addrs.c
 	${CC} ${CFLAGS} -c src/get_hw_addrs.c
 	
-odr_utils.o: utils/odr_utils.o
+odr_utils.o: utils/odr_utils.c
 	${CC} ${CFLAGS} -c utils/odr_utils.c
 
 odr.o: src/odr.c ${DEPS}

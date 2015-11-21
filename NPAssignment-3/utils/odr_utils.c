@@ -162,8 +162,10 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 		}
 	}else{
 
-		printf("No Route for the destination hence forwarding the r_req_packet\n");
-		send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
+		if(route_updated){
+			printf("No Route for the destination hence forwarding the r_req_packet\n");
+			send_frame_rreq(pf_sockid,received_inf_ind,received_frame);
+		}
 	}
 }
 
