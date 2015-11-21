@@ -61,7 +61,7 @@ int main(int argc, char **argv){
 
 	struct timeval t;
 
-	int timeout = 3; // 3 Seconds
+	int timeout = 10; // 3 Seconds
 
 	for(;;)
 	{

@@ -109,12 +109,12 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 		if(broadcast_id >= rnode_entry -> broadcast_id  || force_dsc){
 
 			if((broadcast_id > rnode_entry -> broadcast_id) ||
-					(broadcast_id == rnode_entry -> broadcast_id && hop_count < rnode_entry->hop_count) ||
-					force_dsc)
+					(broadcast_id == rnode_entry -> broadcast_id && hop_count < rnode_entry->hop_count))
 			{
 				rnode_entry->hop_count = hop_count;
 				rnode_entry->outg_inf_index = outg_inf_index;
 				rnode_entry->time_stamp = get_present_time();
+				rnode_entry->broadcast_id = broadcast_id;
 				memcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr,ETH_ALEN);
 				printRoutingTable(rtable_head);
 
@@ -196,6 +196,7 @@ void printRoutingTable(struct route_entry* head)
 		printf("Next Hop");
 		printHWADDR(temp->next_hop_mac_address);
 		printf("Interface index: %d\t",temp->outg_inf_index);
+		printf("Broadcast -id :%d\t",temp->broadcast_id);
 		printf("Time stamp: %ld\t", temp->time_stamp);
 		printf("\n");
 		temp = temp -> next;
