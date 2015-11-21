@@ -406,7 +406,7 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 		// Generate R_REQ and then send R_RPLY
 		printf("No route entry exists. So starting R_REQ for R_RPLY\n");
 
-		frame->hdr.rreq_id = get_new_rreq_id();
+		//frame->hdr.rreq_id = get_new_rreq_id();
 		store_next_to_send_frame(frame);
 
 		struct odr_frame outg_frame;
@@ -483,7 +483,7 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 			printf("Starting R_REQ for payload\n");
 		}
 
-		frame->hdr.rreq_id = get_new_rreq_id();
+		//frame->hdr.rreq_id = get_new_rreq_id();
 		store_next_to_send_frame(frame);
 
 		struct odr_frame outg_frame;
@@ -548,8 +548,7 @@ bool remove_frame(struct odr_frame *frame)
 	temp = temp -> next;
 	while(temp != NULL)
 	{
-		if(temp->frame.hdr.rreq_id == frame->hdr.rreq_id
-						&& !strcmp(temp-> frame.hdr.cn_src_ipaddr,frame->hdr.cn_dsc_ipaddr))
+		if(!strcmp(temp-> frame.hdr.cn_dsc_ipaddr, frame->hdr.cn_src_ipaddr))
 		{
 
 			if(DEBUG)
@@ -621,7 +620,7 @@ void send_frame_for_rreq(int pf_sockfd,struct odr_frame* received_frame,char* sr
 							received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
 
-	if(route_updated || !get_route_entry_timeout())
+	if(route_updated)
 	{
 		printf("Received a rreq destined to me hence sending rreply to next-hop\n");
 

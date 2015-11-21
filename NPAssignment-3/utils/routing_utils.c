@@ -53,7 +53,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 	printf("Entered get_routing_entry\n");
 
 	// if route entry timeout is 0
-	if(!get_route_entry_timeout() || (force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
+	if((force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
 		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
 		return NULL;
@@ -91,10 +91,10 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 
 	printf("Entered updating routing table\n");
 
-	if(!get_route_entry_timeout()){
-		printf("Time out is zero hence not adding/updating the entry in the routing table\n");
-		return false;
-	}
+//	if(!get_route_entry_timeout()){
+//		printf("Time out is zero hence not adding/updating the entry in the routing table\n");
+//		return false;
+//	}
 
 	/**
 	 * Sending force discovery as false because we are updating the routing entry here else
