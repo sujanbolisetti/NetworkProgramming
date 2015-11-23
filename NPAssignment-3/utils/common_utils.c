@@ -21,7 +21,7 @@ msg_send(int sockfd, char* destIpAddress, int destPortNumber,
 	char* msg_odr = build_msg_odr(sockfd, destIpAddress, destPortNumber, message, flag);
 
 	if(write(sockfd,msg_odr,strlen(msg_odr)) <  0){
-		printf("write failed with error :%s\n",strerror(errno));
+		printf("ODR at node :%s , received a error in write :%s\n",Gethostname(),strerror(errno));
 	}
 }
 
@@ -34,9 +34,12 @@ void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int sr
 	serverAddr.sun_family = AF_LOCAL;
 	strcpy(serverAddr.sun_path,get_path_name(src_port_num));
 
-	printf("In Message Send to Uds port Numbers dest %d and src %d\n",destPortNumber,src_port_num);
+	if(DEBUG){
+		printf("In Message Send to Uds port Numbers dest %d and src %d\n",destPortNumber,src_port_num);
+		printf("Path name for uds process %s\n",serverAddr.sun_path);
+	}
 
-	printf("Path name for uds process %s\n",serverAddr.sun_path);
+	printf("ODR at node %s : sending message to application process in uds socket\n",Gethostname());
 
 	if(sendto(sockfd,msg_odr,strlen(msg_odr),0,(SA*)&serverAddr,sizeof(serverAddr)) < 0){
 		printf("Error in send to uds %s\n",strerror(errno));
@@ -54,13 +57,15 @@ char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 	int length=0;
 	char temp_str[120];
 
-	printf("%s\n",destIpAddress);
+	if(DEBUG)
+		printf("%s\n",destIpAddress);
 
 	strcpy(msg_odr,destIpAddress);
 
 	sprintf(temp_str,"%d",destPortNumber);
 
-	printf("%s\n",temp_str);
+	if(DEBUG)
+		printf("%s\n",temp_str);
 
 	length = strlen(destIpAddress);
 
@@ -112,9 +117,17 @@ struct msg_from_uds * msg_receive(int sockfd){
 	int src_port_num;
 	int len = sizeof(struct sockaddr_un);
 
-	if(recvfrom(sockfd, msg_odr, MSG_LEN, 0, (SA*)&peerAddress, &len) > 0){
-		printf("messaged received : %s\n",msg_odr);
-	}
+	again:
+		if(recvfrom(sockfd, msg_odr, MSG_LEN, 0, (SA*)&peerAddress, &len) > 0){
+			if(DEBUG)
+				printf("messaged received : %s\n",msg_odr);
+		}else{
+			if(errno  == EINTR){
+				goto again;
+			}else{
+				printf("ODR at node %s : received an error in recvfrom %s\n",Gethostname(),strerror(errno));
+			}
+		}
 
 	if(DEBUG)
 		printf("path_name of the client/server %s\n",peerAddress.sun_path);
@@ -332,7 +345,9 @@ int add_port_entry(char* path_name)
 	strcpy(port_entr.path_name,path_name);
 
 	port_entries[port_num] = port_entr;
-	printf("Inserted the port entry with index %d\n",port_num);
+
+	if(DEBUG)
+		printf("Inserted the port entry with index %d\n",port_num);
 	// have to insert a time stamp.
 	return port_num;
 }
@@ -359,7 +374,7 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 {
 	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
 					(SA *)&addr_ll,sizeof(addr_ll)) < 0){
-		printf("Error in %s send error type  %s\n",sendType, strerror(errno));
+		printf("ODR at node %s : In sending %s received an error %s\n",Gethostname(),sendType, strerror(errno));
 		exit(-1);
 	}
 }

@@ -85,7 +85,7 @@ int main(int argc, char **argv){
 
 			if(!force_dsc)
 			{
-				printf("client at node %s sending request to server at %s",my_name,server_vm_name);
+				printf("client at node %s sending request to server at %s\n",my_name,server_vm_name);
 			}
 			else
 			{

@@ -18,7 +18,7 @@
 
 #define ETH_FRAME_LEN 1518
 
-#define DEBUG 1
+#define DEBUG 0
 
 #define ODR_GRP_TYPE 1800
 

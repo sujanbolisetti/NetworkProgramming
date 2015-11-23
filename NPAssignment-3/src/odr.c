@@ -91,10 +91,8 @@ int main(int argc, char **argv){
 			payload_frame = build_payload_frame(get_new_rreq_id(),my_ip_address,reply);
 
 			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress, reply->flag, PAY_LOAD)) != NULL){
-
 				printf("ODR at node %s has a route to %s in its routing table\n",Gethostname(),Gethostbyaddr(reply->canonical_ipAddress));
 				send_frame_payload(pf_sockfd,&payload_frame,rt->next_hop_mac_address,rt->outg_inf_index);
-
 			}else{
 
 				/**
@@ -117,13 +115,10 @@ int main(int argc, char **argv){
 
 		if(FD_ISSET(pf_sockfd,&rset)){
 
-			printf("%s received packet from other ODR\n",my_name);
-
 			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
 			int addr_len = sizeof(addr_ll);
 			unsigned char src_mac_addr[6];
 			unsigned char dest_mac_addr[6];
-
 
 			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA*)&addr_ll,&addr_len) < 0){
 				printf("Error in recv_from :%s\n",strerror(errno));
@@ -143,7 +138,6 @@ int main(int argc, char **argv){
 			if(DEBUG)
 				printf("After host conversion odr pkt_type and r_reqid : %d : %d\n",received_frame->hdr.pkt_type,received_frame->hdr.rreq_id);
 
-
 			if(DEBUG)
 			{
 				printf("Packet came to mac-addr ");
@@ -155,10 +149,11 @@ int main(int argc, char **argv){
 			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
 			{
 				memcpy((void *)dest_mac_addr,(void *)inf_mac_addr_map[addr_ll.sll_ifindex],ETH_ALEN);
-				if(DEBUG)
-					printf("After updating dest addr for broadcast packet the interface index: %d\n",addr_ll.sll_ifindex);
 
-				printHWADDR(dest_mac_addr);
+				if(DEBUG){
+					printf("After updating dest addr for broadcast packet the interface index: %d\n",addr_ll.sll_ifindex);
+					printHWADDR(dest_mac_addr);
+				}
 			}
 
 			if(DEBUG)

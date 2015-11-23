@@ -102,8 +102,9 @@ void process_received_rreq_frame(int pf_sockid,int received_inf_ind,
 		printf("ODR at node %s has a route to %s in its routing table\n",Gethostname(),Gethostbyaddr(received_frame->hdr.cn_dsc_ipaddr));
 
 		if(!received_frame->hdr.rreply_sent){
-			printf("ODR at node %s received a rreq packet with R_reply sent flag hence not sending a r_reply\n",Gethostname());
 			send_frame_rreply(pf_sockid,received_frame, rt->hop_count,false);
+		}else{
+			printf("ODR at node %s received a rreq packet with R_reply sent flag hence not sending a r_reply\n",Gethostname());
 		}
 
 		if(route_updated){
@@ -254,6 +255,10 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 	}
 
 	memset(buffer,'\0',sizeof(buffer));
+
+	printf("ODR at node %s : sending msg payload - msg type : %d src : %s dest : %s\n",
+										Gethostname(),frame->hdr.pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+
 	build_eth_frame(buffer,nxt_hop_addr,
 						src_mac_addr,outg_inf_index,
 								&addr_ll,frame, PACKET_OTHERHOST);
@@ -269,9 +274,6 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 		printHWADDR(src_mac_addr);
 		printf("Sending the payload frame and outg inf :%s %d\n",frame->hdr.cn_dsc_ipaddr,outg_inf_index);
 	}
-
-	printf("ODR msg payload - message: msg type: %d src: %s dest: %s\n",
-									frame->hdr.pkt_type,Gethostname(),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
 
 	Sendto(pf_sockfd, buffer, addr_ll,"PAY_LOAD");
 }

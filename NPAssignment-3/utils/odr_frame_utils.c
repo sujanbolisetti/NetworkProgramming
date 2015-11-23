@@ -99,8 +99,6 @@ void build_eth_frame(void *buffer,char *dest_mac,
 	addr_ll->sll_protocol = htons(ODR_GRP_TYPE);
 	addr_ll->sll_halen    = ETH_ALEN;
 
-
-
 	memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
 	memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
 	eh->h_proto = htons(ODR_GRP_TYPE);

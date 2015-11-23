@@ -48,7 +48,8 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 
 struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, int pkt_type){
 
-	printf("Entered get_routing_entry\n");
+	if(DEBUG)
+		printf("Entered get_routing_entry\n");
 
 	if((force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
@@ -70,7 +71,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 			}
 			else
 			{
-				printf("Found stale route entry for destination ip-addr %s\n", dest_ipAddress);
+				printf("ODR at node %s : found a stale entry in its routing table for %s\n", Gethostname(),Gethostbyaddr(dest_ipAddress));
 				remove_route_entry(temp_rnode);
 				return NULL;
 			}
@@ -111,10 +112,10 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 				printRoutingTable(rtable_head);
 
 				if(force_dsc)
-					printf("odr at node %s has updated the routing entry for destination %s because of force route discovery\n",
+					printf("ODR at node %s has updated the routing entry for destination %s because of force route discovery\n",
 																					Gethostname(),Gethostbyaddr(dest_ipaddress));
 				else
-					printf("odr at node %s has updated the routing entry for destination %s \n",
+					printf("ODR at node %s has updated the routing entry for destination %s \n",
 																						Gethostname(),Gethostbyaddr(dest_ipaddress));
 				return true;
 			}
@@ -124,14 +125,17 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 				return false;
 			}
 		}else{
-			printf("Received a rreq/reply with lower broadcastid / less efficient route hence not updating the routing table\n");
+
+			printf("ODR at node %s received a rreq/reply with lower broadcastid / less efficient route hence not updating the routing table\n",
+					Gethostname());
+
 			return false;
 		}
 	}
 	else
 	{
 
-		printf("odr at node %s has added a routing entry for destination %s \n",
+		printf("ODR at node %s has added a routing entry for destination %s \n",
 																			Gethostname(),Gethostbyaddr(dest_ipaddress));
 		if(DEBUG)
 		{
@@ -182,7 +186,7 @@ void remove_route_entry(struct route_entry *rt){
 void printRoutingTable(struct route_entry* head)
 {
 	struct route_entry* temp = head;
-	printf("-----------------odr at node %s : ROUTING TABLE------------------------\n",Gethostname());
+	printf("-----------------ODR at node %s : ROUTING TABLE------------------------\n",Gethostname());
 	while(temp != NULL)
 	{
 		printf("Dest address: %s\t", temp->dest_canonical_ipAddress);
@@ -204,7 +208,7 @@ void freeRoutingTable(){
 	struct route_entry* temp = rtable_head;
 	struct route_entry* next = NULL;
 
-	printf("----------odr at node %s : Freeing ROUTING TABLE----------------------\n",Gethostname());
+	printf("----------ODR at node %s : Freeing ROUTING TABLE----------------------\n",Gethostname());
 
 	while(temp->next != NULL){
 		next = temp->next;
