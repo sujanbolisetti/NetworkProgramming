@@ -97,7 +97,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 
 	if(rnode_entry != NULL)
 	{
-		printf("odr at node %s is updating the routing table\n",Gethostname());
+		printf("ODR at node %s is updating the routing table\n",Gethostname());
 
 		if(broadcast_id >= rnode_entry -> broadcast_id  || force_dsc){
 
@@ -126,7 +126,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 			}
 		}else{
 
-			printf("ODR at node %s received a rreq/reply with lower broadcastid / less efficient route hence not updating the routing table\n",
+			printf("ODR at node %s received a rreq/reply with lower broadcast id / less efficient route hence not updating the routing table\n",
 					Gethostname());
 
 			return false;
