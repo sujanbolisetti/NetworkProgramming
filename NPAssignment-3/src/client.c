@@ -36,7 +36,8 @@ int main(int argc, char **argv){
 		exit(-1);
 	}
 
-	printf("file_name :%s\n",file_name);
+	if(DEBUG)
+		printf("temp-file_name :%s\n",file_name);
 
 	if(unlink(file_name) < 0){
 		printf("str error %s\n",strerror(errno));
@@ -44,7 +45,8 @@ int main(int argc, char **argv){
 
 	strcpy(cli_addr.sun_path, file_name);
 
-	printf("sun_path %s\n",cli_addr.sun_path);
+	if(DEBUG)
+		printf("sun_path %s\n",cli_addr.sun_path);
 
 	Bind(sockfd,(SA *)&cli_addr,sizeof(cli_addr));
 
@@ -53,11 +55,9 @@ int main(int argc, char **argv){
 	memset(my_name,'\0',sizeof(my_name));
 	gethostname(my_name,sizeof(my_name));
 
-	printf("Host Name of the Client Node : %s\n",my_name);
-
 	strcpy(ipAddress,Gethostbyname(my_name));
 
-	printf("Primary IP_Address of the node : %s\n",ipAddress);
+	printf("Client is running on %s with canonical ipaddress %s\n",my_name,ipAddress);
 
 	struct timeval t;
 
@@ -73,9 +73,8 @@ int main(int argc, char **argv){
 			printf("scanf failed with error:%s\n",strerror(errno));
 		}
 
-		int force_dsc = 0;
+		int i,force_dsc = 0;
 
-		int i = 0;
 		for (i = 0; i < 2; i++)
 		{
 			FD_ZERO(&monitor_fds);
@@ -86,28 +85,33 @@ int main(int argc, char **argv){
 
 			if(!force_dsc)
 			{
-				printf("Time request sent to server : %s", server_vm_name);
+				printf("client at node %s sending request to server at %s",my_name,server_vm_name);
 			}
 			else
 			{
-				printf("Time request sent again to server with force discovery : %s\n", server_vm_name);
+				printf("client at node %s re-sending request with force discovery flag set to server at %s",my_name,server_vm_name);
 			}
 
+			/**
+			 *  Re-intializing the time out value
+			 */
 			t = get_time_interval(timeout);
+
 			select(sockfd + 1, &monitor_fds, NULL, NULL, &t);
 
 			if(FD_ISSET(sockfd, &monitor_fds)){
 				struct msg_from_uds *msg = msg_receive(sockfd);
-				printf("Received current time from server : %s\n", msg->msg_received);
+				printf("client at node %s : received from %s <%s>\n",my_name,server_vm_name,msg->msg_received);
 				break;
 			}
 
 			if(force_dsc)
 			{
-				printf("Reply not received from server even after force discovery request. So, exiting the program\n");
+				printf("client at node %s : timeout on response from %s for second time.Hence ignoring the request\n",my_name,server_vm_name);
 				break;
 			}
 
+			printf("client at node %s : timeout on response from %s\n",my_name,server_vm_name);
 			force_dsc = 1;
 		}
 	}
@@ -117,7 +121,7 @@ int main(int argc, char **argv){
 	return 0;
 }
 
-// 3 Seconds
+// Setting the time-out to 3 Seconds
 struct timeval get_time_interval(int secs)
 {
     struct timeval t;

@@ -249,4 +249,9 @@ void remove_route_entry(struct route_entry *rt);
 
 struct timeval get_time_interval(int secs);
 
+void freeRoutingTable();
+
+char*
+Gethostbyaddr(char* canonical_ip_address);
+
 #endif /* USP_H_ */

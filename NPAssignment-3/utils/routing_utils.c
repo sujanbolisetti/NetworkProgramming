@@ -31,8 +31,6 @@ void add_entry_in_rtable(char *dest_ipaddress, char *next_hp_mac_addr, int hop_c
 	memcpy((void *)r_node->next_hop_mac_address,(void *)next_hp_mac_addr,ETH_ALEN);
 
 	r_node->hop_count = hop_count;
-
-	// TODO : have to populate the time_out
 	r_node->outg_inf_index = outg_inf_index;
 	r_node->time_stamp = get_present_time();
 	r_node->broadcast_id = broadcastid;
@@ -52,7 +50,6 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 
 	printf("Entered get_routing_entry\n");
 
-	// if route entry timeout is 0
 	if((force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
 		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
@@ -62,7 +59,6 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 	struct route_entry *temp_rnode = rtable_head;
 	int present_time = get_present_time();
 
-	//TODO Have to check stale entries.
 	while(temp_rnode != NULL){
 
 		if(!strcmp(temp_rnode->dest_canonical_ipAddress,dest_ipAddress)){
@@ -89,12 +85,8 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_count, int outg_inf_index, int force_dsc, int pkt_type,
 			int broadcast_id){
 
-	printf("Entered updating routing table\n");
-
-//	if(!get_route_entry_timeout()){
-//		printf("Time out is zero hence not adding/updating the entry in the routing table\n");
-//		return false;
-//	}
+	if(DEBUG)
+		printf("Entered updating routing table\n");
 
 	/**
 	 * Sending force discovery as false because we are updating the routing entry here else
@@ -104,7 +96,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 
 	if(rnode_entry != NULL)
 	{
-		printf("Updating routing table\n");
+		printf("odr at node %s is updating the routing table\n",Gethostname());
 
 		if(broadcast_id >= rnode_entry -> broadcast_id  || force_dsc){
 
@@ -119,10 +111,11 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 				printRoutingTable(rtable_head);
 
 				if(force_dsc)
-					printf("Updated routing entry for destination ip-addr %s because of force route discovery\n", dest_ipaddress);
+					printf("odr at node %s has updated the routing entry for destination %s because of force route discovery\n",
+																					Gethostname(),Gethostbyaddr(dest_ipaddress));
 				else
-					printf("Updated routing entry for destination ip-addr %s because of better route found\n", dest_ipaddress);
-
+					printf("odr at node %s has updated the routing entry for destination %s \n",
+																						Gethostname(),Gethostbyaddr(dest_ipaddress));
 				return true;
 			}
 			else
@@ -138,7 +131,8 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 	else
 	{
 
-		printf("Added new routing entry for destination ip-addr %s\n", dest_ipaddress);
+		printf("odr at node %s has added a routing entry for destination %s \n",
+																			Gethostname(),Gethostbyaddr(dest_ipaddress));
 		if(DEBUG)
 		{
 			printf("Next Hop Before Add ");
@@ -188,7 +182,7 @@ void remove_route_entry(struct route_entry *rt){
 void printRoutingTable(struct route_entry* head)
 {
 	struct route_entry* temp = head;
-	printf("------------------------ROUTING TABLE--------------------------------\n");
+	printf("-----------------odr at node %s : ROUTING TABLE------------------------\n",Gethostname());
 	while(temp != NULL)
 	{
 		printf("Dest address: %s\t", temp->dest_canonical_ipAddress);
@@ -204,3 +198,20 @@ void printRoutingTable(struct route_entry* head)
 	printf("----------------------------------------------------------------------\n");
 }
 
+
+void freeRoutingTable(){
+
+	struct route_entry* temp = rtable_head;
+	struct route_entry* next = NULL;
+
+	printf("----------odr at node %s : Freeing ROUTING TABLE----------------------\n",Gethostname());
+
+	while(temp->next != NULL){
+		next = temp->next;
+		free(temp);
+		temp = next;
+	}
+
+	free(temp);
+	printf("----------------------------------------------------------------------\n");
+}

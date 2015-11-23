@@ -7,15 +7,12 @@
 
 #include "../src/usp.h"
 
-#define concat(a,b) {a##b}
-
 char *my_name;
 bool isHostNameFilled = false;
 
 struct port_entry port_entries[NUM_PORT_ENTRIES];
 
 int port_num = 2;
-
 
 void
 msg_send(int sockfd, char* destIpAddress, int destPortNumber,
@@ -73,13 +70,15 @@ char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 
 	length+= 1 + strlen(temp_str);
 
-	printf("******length of th port number************* %lu\n",strlen(temp_str));
+	if(DEBUG)
+		printf("******length of th port number************* %lu\n",strlen(temp_str));
 
 	msg_odr[length] = '$';
 
 	strcpy(msg_odr+length+1,message);
 
-	printf("%s\n",message);
+	if(DEBUG)
+		printf("%s\n",message);
 
     length+=1+strlen(message);
 
@@ -89,12 +88,16 @@ char* build_msg_odr(int sockfd, char* destIpAddress, int destPortNumber,
 
 	sprintf(temp_str,"%d",flag);
 
-	printf("%s\n",temp_str);
+	if(DEBUG)
+		printf("%s\n",temp_str);
 
 	strcpy(msg_odr+length+1,temp_str);
 
-	printf("length %d\n",length);
-	printf("complete string %s\n",temp);
+	if(DEBUG){
+		printf("length %d\n",length);
+		printf("complete string %s\n",temp);
+	}
+
 	return temp;
 }
 
@@ -113,7 +116,8 @@ struct msg_from_uds * msg_receive(int sockfd){
 		printf("messaged received : %s\n",msg_odr);
 	}
 
-	printf("path_name of the client/server %s\n",peerAddress.sun_path);
+	if(DEBUG)
+		printf("path_name of the client/server %s\n",peerAddress.sun_path);
 
 	src_port_num = add_port_entry(peerAddress.sun_path);
 
@@ -208,6 +212,28 @@ Gethostbyname(char *my_name){
 	}
 }
 
+char*
+Gethostbyaddr(char* canonical_ip_address){
+
+	struct hostent *he;
+	struct in_addr ipAddr;
+
+	if((inet_pton(AF_INET,canonical_ip_address,&ipAddr)) <  0){
+				printf("%s\n",strerror(errno));
+	}
+
+	if((he = gethostbyaddr(&ipAddr, sizeof(ipAddr), AF_INET))!= NULL){
+		if(DEBUG)
+			printf("The server host name: %s\n", he->h_name);
+		return he->h_name;
+	}else{
+		printf("gethostbyaddr error : %s for ipadress: %s\n",hstrerror(h_errno),canonical_ip_address);
+		exit(-1);
+	}
+	return he->h_name;
+	return NULL;
+}
+
 void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[MAX_INTERFACES][ETH_ALEN])
 {
 	struct hwa_info	*temp = hw_head;
@@ -230,6 +256,9 @@ void fill_inf_mac_addr_map(struct hwa_info	*hw_head, char inf_mac_addr_map[MAX_I
 	}
 }
 
+/**
+ * Helper method to convert into network order.
+ */
 void convertToNetworkOrder(struct odr_hdr *hdr){
 
 	if(DEBUG)
@@ -244,9 +273,11 @@ void convertToNetworkOrder(struct odr_hdr *hdr){
 	hdr->src_port_num = htons(hdr->src_port_num);
 	hdr->rreq_id = htonl(hdr->rreq_id);
 	hdr->payload_len = htons(hdr->payload_len);
-
 }
 
+/**
+ *  Helper method to convert into host order.
+ */
 void convertToHostOrder(struct odr_hdr *hdr){
 
 	if(DEBUG)
@@ -266,7 +297,7 @@ void convertToHostOrder(struct odr_hdr *hdr){
 
 void printHWADDR(char *hw_addr){
 
-	printf(" HW addr = ");
+	printf("HW addr = ");
 	char *ptr = hw_addr;
 	int i = IF_HADDR;
 	do {
@@ -321,6 +352,9 @@ void build_port_entries()
 	port_entries[ODR_PORT] = port_entr;
 }
 
+/**
+ *  Wrappe method for sending the packet.
+ */
 void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType)
 {
 	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
@@ -330,6 +364,9 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 	}
 }
 
+/**
+ *  Helper method for getting the path name for port_name.
+ */
 char* get_path_name(int dest_port_num){
 
 	return port_entries[dest_port_num].path_name;

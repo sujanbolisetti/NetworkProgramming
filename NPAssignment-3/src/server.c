@@ -14,7 +14,6 @@ int main(){
 	struct msg_from_uds *msg;
 	char my_name[128];
 
-
 	memset(my_name,'\0',sizeof(my_name));
 	gethostname(my_name,sizeof(my_name));
 
@@ -42,13 +41,17 @@ int main(){
 
 		msg = msg_receive(listenfd);
 
-		printf("Message received in the server on port_num %d\n",msg->dest_port_num);
+		if(DEBUG)
+			printf("Message received in the server on port_num %d\n",msg->dest_port_num);
 
 		time_t ticks = time(NULL);
 
 		snprintf(write_buff, sizeof(write_buff), "%.24s\r\n" , ctime(&ticks));
 
-		printf("Server the sending the time %s\n",write_buff);
+		printf("server at node %s responding to request from %s\n",my_name,Gethostbyaddr(msg->canonical_ipAddress));
+
+		if(DEBUG)
+			printf("Server the sending the time %s\n",write_buff);
 
 		msg_send(listenfd,msg->canonical_ipAddress,msg->dest_port_num,write_buff,msg->flag);
 	}

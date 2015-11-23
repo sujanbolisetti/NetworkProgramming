@@ -84,16 +84,15 @@ int main(int argc, char **argv){
 
 			struct msg_from_uds *reply = msg_receive(sockfd);
 
-			printf("%s In msg received %d\n",my_name, reply->dest_port_num);
+			printf("ODR at node %s has received a message on unix domain socket from application program\n",my_name);
 
 			struct odr_frame payload_frame;
 
 			payload_frame = build_payload_frame(get_new_rreq_id(),my_ip_address,reply);
 
-			// have to exclude this even when force_route_discovery.
-			// have to implement retransmission for r_req
 			if((rt = get_rentry_in_rtable(reply->canonical_ipAddress, reply->flag, PAY_LOAD)) != NULL){
 
+				printf("ODR at node %s has a route to %s in its routing table\n",Gethostname(),Gethostbyaddr(reply->canonical_ipAddress));
 				send_frame_payload(pf_sockfd,&payload_frame,rt->next_hop_mac_address,rt->outg_inf_index);
 
 			}else{
@@ -141,8 +140,6 @@ int main(int argc, char **argv){
 
 			convertToHostOrder(&(received_frame->hdr));
 
-			//update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,addr_ll.sll_ifindex);
-
 			if(DEBUG)
 				printf("After host conversion odr pkt_type and r_reqid : %d : %d\n",received_frame->hdr.pkt_type,received_frame->hdr.rreq_id);
 
@@ -158,24 +155,25 @@ int main(int argc, char **argv){
 			if(addr_ll.sll_pkttype == PACKET_BROADCAST)
 			{
 				memcpy((void *)dest_mac_addr,(void *)inf_mac_addr_map[addr_ll.sll_ifindex],ETH_ALEN);
-				printf("After updating dest addr for broadcast packet the interface index: %d\n",addr_ll.sll_ifindex);
+				if(DEBUG)
+					printf("After updating dest addr for broadcast packet the interface index: %d\n",addr_ll.sll_ifindex);
+
 				printHWADDR(dest_mac_addr);
 			}
 
-			printf("Packet type (Broadcast/otherhost) from sockaddr_ll %d\n", addr_ll.sll_pkttype);
+			if(DEBUG)
+				printf("Packet type (Broadcast/otherhost) from sockaddr_ll %d\n", addr_ll.sll_pkttype);
 
 			if(DEBUG)
 				printf("Packet destined ip-address %s\n", received_frame->hdr.cn_dsc_ipaddr);
 
+			printf("ODR at node %s has received a packet with type %d with destination %s\n", my_name, received_frame->hdr.pkt_type,
+																								Gethostbyaddr(received_frame->hdr.cn_dsc_ipaddr));
+
+			received_frame->hdr.hop_count++;
+
 			if(is_frame_belongs_to_me(received_frame->hdr.cn_dsc_ipaddr, my_ip_address))
 			{
-				printf("%s has received a packet with type %d which belongs to it\n", my_name, received_frame->hdr.pkt_type);
-				// TODO: send R_REPLY_SENT
-				// have to send application payload/r_reply based on the
-				// type of the frame received.
-				// build_rreply_frame(received_frame);
-
-				received_frame->hdr.hop_count++;
 
 				struct odr_frame *frame_to_send;
 
@@ -183,33 +181,27 @@ int main(int argc, char **argv){
 					case R_REQ:
 						if(DEBUG)
 							printf("Received my R_REQ with id %d\n", received_frame->hdr.rreq_id);
-//						process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
-//												received_frame,src_mac_addr,dest_mac_addr, true);
+
 						send_frame_for_rreq(pf_sockfd, received_frame, src_mac_addr, addr_ll.sll_ifindex);
 						break;
+
 					case R_REPLY:
 						if(DEBUG)
 							printf("Received my R_RPLY destined to me\n");
-//						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr,
-//								received_frame->hdr.hop_count,addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type);
-//						frame_to_send =  get_next_send_packet(received_frame);
-//						send_frame_payload(pf_sockfd, frame_to_send, src_mac_addr, addr_ll.sll_ifindex);
-//						remove_data_payload(received_frame);
+
 						send_frame_for_rrply(pf_sockfd, received_frame, src_mac_addr, addr_ll.sll_ifindex);
 						break;
 
 					case PAY_LOAD:
-						// have to send the packet to the Unix domain socket - client
-					    // the port/path name of the client, you need to get from the mapping
-						// stored.
 						if(DEBUG)
 							printf("Received pay_load destined to me %s\n", my_name);
-						// TODO : have to write proper code for payload sending to above uds process.
 
 						update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
 								addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 
-						printf("Sending the message to the server/ client\n");
+						if(DEBUG)
+							printf("Sending the message to the server/ client\n");
+
 						msg_send_to_uds(sockfd,received_frame->hdr.cn_src_ipaddr,received_frame->hdr.src_port_num,received_frame->hdr.dest_port_num,
 										received_frame->payload,received_frame->hdr.force_route_dcvry);
 						break;
@@ -220,21 +212,27 @@ int main(int argc, char **argv){
 			}
 			else
 			{
-				received_frame->hdr.hop_count++;
 				switch(received_frame->hdr.pkt_type){
 
 				case R_REQ:
-					printf("Received R_REQ and processing to see whether a route exist else forwarding\n");
+					if(DEBUG)
+						printf("Received R_REQ and processing to see whether a route exist else forwarding\n");
+
 					process_received_rreq_frame(pf_sockfd,addr_ll.sll_ifindex,
 															received_frame,src_mac_addr,dest_mac_addr);
 					break;
 				case R_REPLY:
-					printf("Received R_RPLY and forwarding same\n");
+					if(DEBUG)
+						printf("Received R_RPLY and forwarding same\n");
+
 					process_received_rreply_frame(pf_sockfd,addr_ll.sll_ifindex,
 															received_frame,src_mac_addr,dest_mac_addr,false);
 					break;
 				case PAY_LOAD:
-					printf("Received PAY_LOAD and forwarding same\n");
+
+					if(DEBUG)
+						printf("Received PAY_LOAD and forwarding same\n");
+
 					update_routing_table(received_frame->hdr.cn_src_ipaddr, src_mac_addr, received_frame->hdr.hop_count,
 							addr_ll.sll_ifindex, received_frame->hdr.force_route_dcvry, received_frame->hdr.pkt_type,received_frame->hdr.broadcast_id);
 					forward_frame_payload(pf_sockfd, received_frame);
@@ -245,6 +243,11 @@ int main(int argc, char **argv){
 			}
 		}
 	}
+
+	/**
+	 * Freeing the routing table
+	 */
+	freeRoutingTable();
 }
 
 int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)
@@ -272,12 +275,16 @@ int get_route_entry_timeout()
 void set_route_entry_timeout(long int timeout)
 {
 	route_entry_timeout = timeout;
-	printf("Staleness parameter set as %ld seconds\n", timeout);
+
+	if(DEBUG)
+		printf("Staleness parameter set as %ld seconds\n", timeout);
 }
 
 int get_new_broadcast_id()
 {
-	printf("Getting the broadcast Id :%d\n",broadcast_id);
+	if(DEBUG)
+		printf("Getting the broadcast Id :%d\n",broadcast_id);
+
 	return broadcast_id++;
 }
 
