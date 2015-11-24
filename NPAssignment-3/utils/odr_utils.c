@@ -58,8 +58,14 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 						hw_temp->if_haddr,hw_temp->if_index,
 						&addr_ll,frame,PACKET_BROADCAST);
 
+			char* host_name = (char*)malloc(sizeof(char)*10);
+			char* pkt_type = (char*)malloc(sizeof(char)*10);
+
+			strcpy(host_name, Gethostname());
+			strcpy(pkt_type,get_packet_type(frame->hdr.pkt_type));
+
 			printf("ODR at node %s is sending packet with type %s - src: %s dest ",
-															Gethostname(),get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+															host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
 			printHWADDR(BROADCAST_MAC_ADDRESS);
 
 			Sendto(pf_sockfd, buffer, addr_ll,"R_REQ");
@@ -194,6 +200,23 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 		if(DEBUG)
 			printf("route entry exists\n");
 
+		char* host_name = (char*)malloc(sizeof(char)*10);
+
+		strcpy(host_name, Gethostname());
+
+		char* pkt_type = (char*)malloc(sizeof(char)*10);
+
+		strcpy(pkt_type,get_packet_type(frame->hdr.pkt_type));
+
+		if(frame->hdr.rreply_sent)
+			printf("ODR at node %s is sending packet with type %s with R_RPLY_FLAG set - src: %s dest ",
+															host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+		else
+			printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+																		host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+
+		printHWADDR(rt->next_hop_mac_address);
+
 		memset(buffer,'\0',sizeof(buffer));
 		build_eth_frame(buffer,rt->next_hop_mac_address,
 				src_mac_addr,rt->outg_inf_index,
@@ -201,12 +224,6 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 
 		if(DEBUG)
 			printf("built frame\n");
-
-		printf("ODR at node %s is sending packet with type %s - src: %s dest ",
-																	Gethostname(),get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
-
-
-		printHWADDR(rt->next_hop_mac_address);
 
 		Sendto(pf_sockfd, buffer, addr_ll, "R_RPLY");
 	}
@@ -275,9 +292,18 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 
 	strcpy(dst,Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
 
-	printf("ODR at node %s sending msg type : %s - src : %s - dest : %s\n",
-										Gethostname(),get_packet_type(frame->hdr.pkt_type),src,
-										dst);
+	char* host_name = (char*)malloc(sizeof(char)*10);
+
+	strcpy(host_name, Gethostname());
+
+	char* pkt_type = (char*)malloc(sizeof(char)*10);
+
+	strcpy(pkt_type,get_packet_type(frame->hdr.pkt_type));
+
+	printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+													host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+
+	printHWADDR(nxt_hop_addr);
 
 	build_eth_frame(buffer,nxt_hop_addr,
 						src_mac_addr,outg_inf_index,
@@ -322,8 +348,16 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 
 		struct odr_frame outg_frame;
 
-		printf("ODR at node %s forwarding packet with type %s with dest %s", Gethostname(),
-									get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+		char* host_name = (char*)malloc(sizeof(char)*10);
+
+		strcpy(host_name, Gethostname());
+
+		char* pkt_type = (char*)malloc(sizeof(char)*10);
+
+		strcpy(pkt_type,get_packet_type(frame->hdr.pkt_type));
+
+		printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+														host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
 
 		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
 					ZERO_HOP_COUNT, R_REQ, get_new_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
@@ -447,8 +481,16 @@ void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_m
 		printHWADDR(dest_mac_addr);
 	}
 
-	printf("ODR at node %s is sending frame hdr - src: %s dest ",
-																Gethostname(),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+	char* host_name = (char*)malloc(sizeof(char)*10);
+
+	strcpy(host_name, Gethostname());
+
+	char* pkt_type = (char*)malloc(sizeof(char)*10);
+
+	strcpy(pkt_type,get_packet_type(frame->hdr.pkt_type));
+
+	printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+													host_name,pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
 
 	printHWADDR(dest_mac_addr);
 

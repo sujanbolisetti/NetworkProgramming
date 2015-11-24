@@ -237,12 +237,14 @@ int main(int argc, char **argv){
 				}
 			}
 		}
+
+		printf("-------------------------------------------------------------------------------\n");
 	}
 
 	/**
 	 * Freeing the routing table
 	 */
-	freeRoutingTable();
+	//freeRoutingTable();
 }
 
 int is_frame_belongs_to_me(char* dest_ip_addr, char* my_ip_addr)

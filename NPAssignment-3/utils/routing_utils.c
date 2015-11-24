@@ -53,7 +53,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 
 	if((force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
-		printf("Returning route for %s as null because of force discovery or route entry timeout\n", dest_ipAddress);
+		printf("Returning route for %s as null because of force discovery\n", Gethostbyaddr(dest_ipAddress));
 		return NULL;
 	}
 
@@ -71,7 +71,7 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 			}
 			else
 			{
-				printf("ODR at node %s : found a stale entry in its routing table for %s\n", Gethostname(),Gethostbyaddr(dest_ipAddress));
+				printf("ODR at node %s found a stale entry in its routing table for %s\n", Gethostname(),Gethostbyaddr(dest_ipAddress));
 				remove_route_entry(temp_rnode);
 				return NULL;
 			}
@@ -109,7 +109,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 				rnode_entry->time_stamp = get_present_time();
 				rnode_entry->broadcast_id = broadcast_id;
 				memcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr,ETH_ALEN);
-				printRoutingTable(rtable_head);
+				//printRoutingTable(rtable_head);
 
 				if(force_dsc)
 					printf("ODR at node %s has updated the routing entry for destination %s because of force route discovery\n",
@@ -123,7 +123,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 			{
 				printf("ODR at node %s received a rreq/ reply/ payload with lower broadcast id/ less efficient route so not updating the routing table\n",
 									Gethostname());
-				printRoutingTable(rtable_head);
+				//printRoutingTable(rtable_head);
 				return false;
 			}
 		}else{
@@ -146,7 +146,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 		}
 
 		add_entry_in_rtable(dest_ipaddress, next_hp_mac_addr, hop_count, outg_inf_index,broadcast_id);
-		printRoutingTable(rtable_head);
+		//printRoutingTable(rtable_head);
 		return true;
 	}
 }
@@ -210,7 +210,8 @@ void freeRoutingTable(){
 	struct route_entry* temp = rtable_head;
 	struct route_entry* next = NULL;
 
-	printf("----------ODR at node %s : Freeing ROUTING TABLE----------------------\n",Gethostname());
+	if(DEBUG)
+		printf("----------ODR at node %s : Freeing ROUTING TABLE----------------------\n",Gethostname());
 
 	while(temp->next != NULL){
 		next = temp->next;

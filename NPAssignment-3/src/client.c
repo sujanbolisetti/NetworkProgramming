@@ -92,7 +92,7 @@ int main(int argc, char **argv){
 			}
 			else
 			{
-				printf("client at node %s re-sending request with force discovery flag set to server at %s",my_name,server_vm_name);
+				printf("client at node %s re-sending request with force discovery flag set to server at %s\n",my_name,server_vm_name);
 			}
 
 			/**

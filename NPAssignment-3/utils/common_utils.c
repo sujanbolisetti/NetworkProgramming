@@ -210,6 +210,7 @@ Gethostbyname(char *my_name){
 
 	struct hostent *he;
 	struct in_addr **ipaddr_list;
+	//char* ip_addr = (char *)malloc(128);
 
 	if((he  = gethostbyname(my_name)) !=NULL){
 		ipaddr_list = (struct in_addr **)he->h_addr_list;
@@ -218,6 +219,8 @@ Gethostbyname(char *my_name){
 		 *  first address as that is the canonical IpAddress
 		 *  we are considering.
 		 */
+
+		//strcpy(ip_addr,inet_ntoa(*ipaddr_list[0]));
 		return inet_ntoa(*ipaddr_list[0]);
 	}else{
 		printf("gethostbyname error: %s for hostname: %s\n",hstrerror(h_errno),my_name);
@@ -230,6 +233,7 @@ Gethostbyaddr(char* canonical_ip_address){
 
 	struct hostent *he;
 	struct in_addr ipAddr;
+	//char* vm_name = (char *)malloc(20);
 
 	if((inet_pton(AF_INET,canonical_ip_address,&ipAddr)) <  0){
 				printf("%s\n",strerror(errno));
@@ -238,6 +242,7 @@ Gethostbyaddr(char* canonical_ip_address){
 	if((he = gethostbyaddr(&ipAddr, sizeof(ipAddr), AF_INET))!= NULL){
 		if(DEBUG)
 			printf("The server host name: %s\n", he->h_name);
+		//strcpy(vm_name,he->h_name);
 		return he->h_name;
 	}else{
 		printf("gethostbyaddr error : %s for ipadress: %s\n",hstrerror(h_errno),canonical_ip_address);
@@ -399,6 +404,9 @@ char* get_packet_type(int pkt_type){
 		return "R_RPLY";
 	case 2:
 		return "PAY_LOAD";
+	default:
+		printf("Pkt_type :%d\n",pkt_type);
+		return "Unknown";
 	}
 }
 
