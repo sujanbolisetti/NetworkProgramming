@@ -8,19 +8,19 @@ CFLAGS = ${FLAGS} -Isrc/
 
 DEPS =  src/usp.h src/constants.h
 
-all: client_sbolisetti server_sbolisetti odr_sbolisetti
+all: client_sbolisetti_sthota server_sbolisetti_sthota odr_sbolisetti_sthota
 
-client_sbolisetti: client.o wrapsock.o common_utils.o
-	${CC} ${FLAGS} client.o wrapsock.o common_utils.o -o client_sbolisetti ${LIBS}
+client_sbolisetti_sthota: client.o wrapsock.o common_utils.o
+	${CC} ${FLAGS} client.o wrapsock.o common_utils.o -o client_sbolisetti_sthota ${LIBS}
 	
 client.o: src/client.c ${DEPS}
 	${CC} ${FLAGS} -c src/client.c
 	
-server_sbolisetti: server.o wrapsock.o common_utils.o
-	${CC} ${FLAGS} server.o wrapsock.o common_utils.o -o server_sbolisetti ${LIBS}
+server_sbolisetti_sthota: server.o wrapsock.o common_utils.o
+	${CC} ${FLAGS} server.o wrapsock.o common_utils.o -o server_sbolisetti_sthota ${LIBS}
 
-odr_sbolisetti: odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o
-	${CC} ${FLAGS} odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o -o odr_sbolisetti ${LIBS}
+odr_sbolisetti_sthota: odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o
+	${CC} ${FLAGS} odr.o sock_ntop_host.o get_hw_addrs.o common_utils.o wrapsock.o odr_frame_utils.o odr_utils.o routing_utils.o -o odr_sbolisetti_sthota ${LIBS}
 
 server.o: src/server.c ${DEPS}
 	${CC} ${CFLAGS} -c src/server.c
@@ -51,4 +51,4 @@ routing_utils.o: utils/routing_utils.c
 
 
 clean:
-	rm client_sbolisetti server_sbolisetti odr_sbolisetti *.o
+	rm client_sbolisetti_sthota server_sbolisetti_sthota odr_sbolisetti_sthota *.o

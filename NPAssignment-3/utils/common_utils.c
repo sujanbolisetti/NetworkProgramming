@@ -39,7 +39,7 @@ void msg_send_to_uds(int sockfd, char* destIpAddress, int destPortNumber, int sr
 		printf("Path name for uds process %s\n",serverAddr.sun_path);
 	}
 
-	printf("ODR at node %s : sending message to application process in uds socket\n",Gethostname());
+	printf("ODR at node %s sending message to client/ server in Unix domain socket\n",Gethostname());
 
 	if(sendto(sockfd,msg_odr,strlen(msg_odr),0,(SA*)&serverAddr,sizeof(serverAddr)) < 0){
 		printf("Error in send to uds %s\n",strerror(errno));
@@ -243,7 +243,6 @@ Gethostbyaddr(char* canonical_ip_address){
 		printf("gethostbyaddr error : %s for ipadress: %s\n",hstrerror(h_errno),canonical_ip_address);
 		exit(-1);
 	}
-	return he->h_name;
 	return NULL;
 }
 
@@ -310,7 +309,7 @@ void convertToHostOrder(struct odr_hdr *hdr){
 
 void printHWADDR(char *hw_addr){
 
-	printf("HW addr = ");
+	printf("hw addr = ");
 	char *ptr = hw_addr;
 	int i = IF_HADDR;
 	do {
@@ -386,3 +385,20 @@ char* get_path_name(int dest_port_num){
 
 	return port_entries[dest_port_num].path_name;
 }
+
+/**
+ * Helper method to return the pkt_type
+ */
+char* get_packet_type(int pkt_type){
+
+	switch(pkt_type){
+
+	case 0:
+		return "R_REQ";
+	case 1:
+		return "R_RPLY";
+	case 2:
+		return "PAY_LOAD";
+	}
+}
+

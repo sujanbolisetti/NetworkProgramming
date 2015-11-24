@@ -121,12 +121,14 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 			}
 			else
 			{
+				printf("ODR at node %s received a rreq/ reply/ payload with lower broadcast id/ less efficient route so not updating the routing table\n",
+									Gethostname());
 				printRoutingTable(rtable_head);
 				return false;
 			}
 		}else{
 
-			printf("ODR at node %s received a rreq/reply with lower broadcast id / less efficient route hence not updating the routing table\n",
+			printf("ODR at node %s received a rreq/ reply/ payload with lower broadcast id/ less efficient route so not updating the routing table\n",
 					Gethostname());
 
 			return false;
@@ -199,7 +201,7 @@ void printRoutingTable(struct route_entry* head)
 		printf("\n");
 		temp = temp -> next;
 	}
-	printf("----------------------------------------------------------------------\n");
+	printf("------------------------------------------------------------------------\n");
 }
 
 

@@ -57,14 +57,17 @@ int main(int argc, char **argv){
 
 	strcpy(ipAddress,Gethostbyname(my_name));
 
-	printf("Client is running on %s with canonical ipaddress %s\n",my_name,ipAddress);
+	printf("Starting the client on %s\n",my_name);
 
 	struct timeval t;
 
-	int timeout = 10; // 3 Seconds
+	int timeout = 3; // 3 Seconds
 
 	for(;;)
 	{
+
+		printf("----------------------------------------------------------------------\n");
+
 		printf("Enter the server node name (vm1....vm10)\n");
 
 		memset(server_vm_name,'\0',sizeof(server_vm_name));
@@ -101,7 +104,7 @@ int main(int argc, char **argv){
 
 			if(FD_ISSET(sockfd, &monitor_fds)){
 				struct msg_from_uds *msg = msg_receive(sockfd);
-				printf("client at node %s : received from %s <%s>\n",my_name,server_vm_name,msg->msg_received);
+				printf("client at node %s received the time from %s as : %s\n",my_name,server_vm_name,msg->msg_received);
 				break;
 			}
 

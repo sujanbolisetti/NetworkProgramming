@@ -58,8 +58,8 @@ void send_frame_rreq(int pf_sockfd,int recv_inf_index,
 						hw_temp->if_haddr,hw_temp->if_index,
 						&addr_ll,frame,PACKET_BROADCAST);
 
-			printf("ODR at node %s is sending frame hdr- src: %s dest ",
-															Gethostname(),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+			printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+															Gethostname(),get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
 			printHWADDR(BROADCAST_MAC_ADDRESS);
 
 			Sendto(pf_sockfd, buffer, addr_ll,"R_REQ");
@@ -202,6 +202,12 @@ void send_frame_rreply(int pf_sockfd, struct odr_frame *frame,
 		if(DEBUG)
 			printf("built frame\n");
 
+		printf("ODR at node %s is sending packet with type %s - src: %s dest ",
+																	Gethostname(),get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+
+
+		printHWADDR(rt->next_hop_mac_address);
+
 		Sendto(pf_sockfd, buffer, addr_ll, "R_RPLY");
 	}
 	else
@@ -256,8 +262,22 @@ void send_frame_payload(int pf_sockfd,struct odr_frame *frame,
 
 	memset(buffer,'\0',sizeof(buffer));
 
-	printf("ODR at node %s : sending msg payload - msg type : %d src : %s dest : %s\n",
-										Gethostname(),frame->hdr.pkt_type,Gethostbyaddr(frame->hdr.cn_src_ipaddr),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+	if(DEBUG){
+		printf("src ip-address in payload %s\n",Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+		printf("dest ip-address in payload %s\n",Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+	}
+
+	char *src = (char *)malloc(sizeof(char)*20);
+
+	strcpy(src,Gethostbyaddr(frame->hdr.cn_src_ipaddr));
+
+	char *dst =  (char *)malloc(sizeof(char)*20);
+
+	strcpy(dst,Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+
+	printf("ODR at node %s sending msg type : %s - src : %s - dest : %s\n",
+										Gethostname(),get_packet_type(frame->hdr.pkt_type),src,
+										dst);
 
 	build_eth_frame(buffer,nxt_hop_addr,
 						src_mac_addr,outg_inf_index,
@@ -283,8 +303,11 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 	struct route_entry* rt;
 	if((rt = get_rentry_in_rtable(frame->hdr.cn_dsc_ipaddr, frame->hdr.force_route_dcvry, frame->hdr.pkt_type)) != NULL)
 	{
+		printf("ODR at node %s has a route to %s in its routing table\n",Gethostname(),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+
 		if(DEBUG)
 			printf("Found route entry to forward payload for dest ip addr %s\n", frame->hdr.cn_dsc_ipaddr);
+
 		send_frame_payload(pf_sockfd, frame, rt->next_hop_mac_address, rt->outg_inf_index);
 	}
 	else
@@ -298,7 +321,10 @@ void forward_frame_payload(int pf_sockfd,struct odr_frame *frame)
 		store_next_to_send_frame(frame);
 
 		struct odr_frame outg_frame;
-		printf("Sending R_REQ and my ip addr %s", Gethostbyname(Gethostname()));
+
+		printf("ODR at node %s forwarding packet with type %s with dest %s", Gethostname(),
+									get_packet_type(frame->hdr.pkt_type),Gethostbyaddr(frame->hdr.cn_dsc_ipaddr));
+
 		outg_frame = build_odr_frame(Gethostbyname(Gethostname()), frame->hdr.cn_dsc_ipaddr,
 					ZERO_HOP_COUNT, R_REQ, get_new_broadcast_id(), frame->hdr.rreq_id, NO_FORCE_DSC, R_REPLY_NOT_SENT, NULL, NULL);
 
@@ -421,7 +447,7 @@ void send_rrply_to_next_hop(int pf_sockfd, struct odr_frame *frame, char* dest_m
 		printHWADDR(dest_mac_addr);
 	}
 
-	printf("ODR at node %s is sending frame hdr- src: %s dest ",
+	printf("ODR at node %s is sending frame hdr - src: %s dest ",
 																Gethostname(),Gethostbyaddr(frame->hdr.cn_src_ipaddr));
 
 	printHWADDR(dest_mac_addr);

@@ -254,4 +254,6 @@ void freeRoutingTable();
 char*
 Gethostbyaddr(char* canonical_ip_address);
 
+char* get_packet_type(int pkt_type);
+
 #endif /* USP_H_ */

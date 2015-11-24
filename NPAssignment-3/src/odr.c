@@ -84,7 +84,7 @@ int main(int argc, char **argv){
 
 			struct msg_from_uds *reply = msg_receive(sockfd);
 
-			printf("ODR at node %s has received a message on unix domain socket from application program\n",my_name);
+			printf("ODR at node %s has received a message on Unix domain socket from client/ server\n",my_name);
 
 			struct odr_frame payload_frame;
 
@@ -162,7 +162,7 @@ int main(int argc, char **argv){
 			if(DEBUG)
 				printf("Packet destined ip-address %s\n", received_frame->hdr.cn_dsc_ipaddr);
 
-			printf("ODR at node %s has received a packet with type %d with destination %s\n", my_name, received_frame->hdr.pkt_type,
+			printf("ODR at node %s has received a packet with type %s with destination as %s\n", my_name, get_packet_type(received_frame->hdr.pkt_type),
 																								Gethostbyaddr(received_frame->hdr.cn_dsc_ipaddr));
 
 			received_frame->hdr.hop_count++;
