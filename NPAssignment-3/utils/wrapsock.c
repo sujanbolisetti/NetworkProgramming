@@ -20,7 +20,7 @@ void
 Connect(int fd, const struct sockaddr *sa, socklen_t salen)
 {
 	if (connect(fd, sa, salen) < 0){
-		printf("connect error %s\n",strerror(errno));
+		printf("connect error in connecting to odr : %s kindly start the odr process before starting the client/server\n",strerror(errno));
 		exit(0);
 	}
 }

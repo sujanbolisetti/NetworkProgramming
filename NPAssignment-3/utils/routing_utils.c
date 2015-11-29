@@ -53,7 +53,8 @@ struct route_entry* get_rentry_in_rtable(char *dest_ipAddress, int force_dsc, in
 
 	if((force_dsc && (pkt_type == R_REQ || pkt_type == PAY_LOAD)))
 	{
-		printf("Returning route for %s as null because of force discovery\n", Gethostbyaddr(dest_ipAddress));
+		printf("ODR at node %s is not performing a routing table lookup for %s because of force discovery\n",
+																	Gethostname(),Gethostbyaddr(dest_ipAddress));
 		return NULL;
 	}
 
@@ -97,7 +98,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 
 	if(rnode_entry != NULL)
 	{
-		printf("ODR at node %s is updating the routing table\n",Gethostname());
+		printf("ODR at node %s is updating the routing table for node %s\n",Gethostname(),Gethostbyaddr(dest_ipaddress));
 
 		if(broadcast_id >= rnode_entry -> broadcast_id  || force_dsc){
 
@@ -109,7 +110,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 				rnode_entry->time_stamp = get_present_time();
 				rnode_entry->broadcast_id = broadcast_id;
 				memcpy(rnode_entry->next_hop_mac_address, next_hp_mac_addr,ETH_ALEN);
-				//printRoutingTable(rtable_head);
+				printRoutingTable(rtable_head);
 
 				if(force_dsc)
 					printf("ODR at node %s has updated the routing entry for destination %s because of force route discovery\n",
@@ -146,7 +147,7 @@ bool update_routing_table(char *dest_ipaddress, char *next_hp_mac_addr, int hop_
 		}
 
 		add_entry_in_rtable(dest_ipaddress, next_hp_mac_addr, hop_count, outg_inf_index,broadcast_id);
-		//printRoutingTable(rtable_head);
+		printRoutingTable(rtable_head);
 		return true;
 	}
 }

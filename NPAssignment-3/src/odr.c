@@ -162,8 +162,16 @@ int main(int argc, char **argv){
 			if(DEBUG)
 				printf("Packet destined ip-address %s\n", received_frame->hdr.cn_dsc_ipaddr);
 
-			printf("ODR at node %s has received a packet with type %s with destination as %s\n", my_name, get_packet_type(received_frame->hdr.pkt_type),
-																								Gethostbyaddr(received_frame->hdr.cn_dsc_ipaddr));
+			char *src = (char *)malloc(sizeof(char)*20);
+
+			strcpy(src,Gethostbyaddr(received_frame->hdr.cn_src_ipaddr));
+
+			char *dst =  (char *)malloc(sizeof(char)*20);
+
+			strcpy(dst,Gethostbyaddr(received_frame->hdr.cn_dsc_ipaddr));
+
+			printf("ODR at node %s has received a packet with type %s with src as %s and destination as %s\n", my_name, get_packet_type(received_frame->hdr.pkt_type),
+																			src,dst);
 
 			received_frame->hdr.hop_count++;
 
