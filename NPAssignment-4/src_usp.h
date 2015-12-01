@@ -59,34 +59,35 @@
 
 #define SA struct sockaddr
 
+#define	min(a,b)	((a) < (b) ? (a) : (b))
+#define	max(a,b)	((a) > (b) ? (a) : (b))
+
 struct tour_route{
 
-	in_addr_t ip_address;
+	char ip_address[32];
 	uint16_t port_number;
 };
 
 struct tour_route*
 create_tour_list(int count , char **argv);
 
-uint32_t
-Gethostbyname(char *my_name);
 
 void insert_my_address_at_bgn();
 
 void insert_multicast_address_at_lst();
 
-uint32_t
+char*
 Gethostbyname(char *my_name);
 
 char* Gethostname();
 
-void build_ip_header(char *buff, uint16_t index,int total_len);
+void build_ip_header(char *buff, uint16_t index,uint16_t total_len);
 
 void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count);
 
 uint32_t getIpAddressInTourList(uint16_t index);
 
-int
-calculate_length(int count);
+uint16_t
+calculate_length(int tour_list_len);
 
 #endif /* SRC_USP_H_ */

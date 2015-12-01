@@ -18,13 +18,13 @@ struct tour_route * create_tour_list(int count , char **argv){
 
 	for(i=1; i < count ;i++){
 		struct tour_route route;
-		route.ip_address = Gethostbyname(argv[i]);
+
+		strcpy(route.ip_address ,Gethostbyname(argv[i]));
+
 		tour_list[i] = route;
 		if(DEBUG){
-			struct in_addr tempAddr;
-			tempAddr.s_addr = route.ip_address;
 			printf("Inserted in the list \n");
-			printf("in presentation format %s\n",inet_ntoa(tempAddr));
+			printf("in presentation format %s\n",route.ip_address);
 		}
 	}
 
@@ -36,19 +36,14 @@ struct tour_route * create_tour_list(int count , char **argv){
 void insert_my_address_at_bgn(){
 
 	struct tour_route route;
-	route.ip_address = Gethostbyname(Gethostname());
+	strcpy(route.ip_address,Gethostbyname(Gethostname()));
 
 	if(tour_list != NULL){
 
 		if(DEBUG){
-			struct in_addr tempAddr;
-			tempAddr.s_addr = route.ip_address;
 			printf("Inserted in the list at bg\n");
-			printf("in presentation format %s\n",inet_ntoa(tempAddr));
+			printf("in presentation format %s\n",route.ip_address);
 		}
-
-		//node->next = tour_list_head;
-		//tour_list_head = node;
 
 		tour_list[0] = route;
 	}
@@ -67,24 +62,17 @@ void insert_multicast_address_at_lst(int count){
 		exit(0);
 	}
 
-	//struct tour_route *node = (struct tour_route *)malloc(sizeof(struct tour_route));
-	//node->ip_address = multi_addr.s_addr;
-	//node->port_number = MULTICAST_PORT_NUMBER;
-	//node->next = NULL;
-
 	struct tour_route route;
-	route.ip_address = multi_addr.s_addr;
-	route.port_number = MULTICAST_PORT_NUMBER;
+	strcpy(route.ip_address,MULTICAST_ADDRESS);
+	route.port_number = htons(MULTICAST_PORT_NUMBER);
 	tour_list[count] = route;
 
 	if(DEBUG){
-			printf("Ending at the last in the list\n");
-		}
-
+		printf("Ending at the last in the list\n");
+	}
 }
 
-
-uint32_t
+char*
 Gethostbyname(char *my_name){
 
 	struct hostent *he;
@@ -103,7 +91,7 @@ Gethostbyname(char *my_name){
 		 */
 
 		//strcpy(ip_addr,inet_ntoa(*ipaddr_list[0]));
-		return ipaddr_list[0]->s_addr;
+		return inet_ntoa(*ipaddr_list[0]);
 	}else{
 		printf("gethostbyname error: %s for hostname: %s\n",hstrerror(h_errno),my_name);
 		exit(-1);
@@ -122,7 +110,7 @@ char* Gethostname(){
 }
 
 
-void build_ip_header(char *buff, uint16_t index,int total_len){
+void build_ip_header(char *buff, uint16_t index,uint16_t total_len){
 
 	if(DEBUG)
 		printf("Building the IP_Address\n");
@@ -135,7 +123,6 @@ void build_ip_header(char *buff, uint16_t index,int total_len){
 
 	ip->ip_tos = 0;
 
-	//TODO : Have to set the total length.
 	ip->ip_len = htons(total_len);
 
 	ip->ip_id = htons(IDENTIFICATION_FIELD);
@@ -144,9 +131,11 @@ void build_ip_header(char *buff, uint16_t index,int total_len){
 
 	ip->ip_ttl = htons(1);
 
-	ip->ip_src.s_addr = htons(Gethostbyname(Gethostname()));
+	ip->ip_p = htons(GRP_PROTOCOL_VALUE);
 
-	ip->ip_dst.s_addr = htons(getIpAddressInTourList(index));
+	ip->ip_src.s_addr = inet_addr(Gethostbyname(Gethostname()));
+
+	ip->ip_dst.s_addr = getIpAddressInTourList(index);
 }
 
 void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count){
@@ -171,17 +160,6 @@ void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count){
 
 uint32_t getIpAddressInTourList(uint16_t index){
 
-//	while(temp != NULL){
-//
-//		if(index == count){
-//			return temp->ip_address;
-//		}
-//
-//		temp = temp->next;
-//		count++;
-//	}
-
-
 	if(DEBUG)
 		printf("Getting the IpAddress in the tourList\n");
 
@@ -189,25 +167,23 @@ uint32_t getIpAddressInTourList(uint16_t index){
 	 *  Two checks may be unnecessary will have
 	 *  to check.
 	 */
-	if(tour_list != NULL && index < SIZE_OF_TOUR_LIST){
+	if(index < SIZE_OF_TOUR_LIST){
 
 		if(DEBUG){
-			struct in_addr tempAddr;
-			tempAddr.s_addr = tour_list[index].ip_address;
 			printf("In getting the IpAddress bg\n");
-			printf("in presentation format %s\n",inet_ntoa(tempAddr));
+			printf("in presentation format %s\n",tour_list[index].ip_address);
 		}
 
-
-		return tour_list[index].ip_address;
+		return inet_addr(tour_list[index].ip_address);
 	}
-
 
 	return 0;
 }
 
-int
+uint16_t
 calculate_length(int tour_list_len){
+
+	printf("Length %ld\n",(tour_list_len*sizeof(struct tour_route) + 4 + sizeof(struct ip)));
 
 	return tour_list_len*sizeof(struct tour_route) + 4 + sizeof(struct ip);
 }
