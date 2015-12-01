@@ -63,31 +63,48 @@
 #define	max(a,b)	((a) > (b) ? (a) : (b))
 
 struct tour_route{
-
 	char ip_address[32];
 	uint16_t port_number;
 };
 
-struct tour_route*
-create_tour_list(int count , char **argv);
+struct tour_payload{
 
+	uint16_t index;
+	uint16_t count;
+	struct tour_route tour_list[SIZE_OF_TOUR_LIST];
+};
 
-void insert_my_address_at_bgn();
+void
+create_tour_list(int count , char **argv, struct tour_route *tour_list);
 
-void insert_multicast_address_at_lst();
+void
+insert_me_address_at_bgn(struct tour_route *tour_list);
+
+void
+insert_multicast_address_at_lst(int count,struct tour_route *tour_list);
 
 char*
 Gethostbyname(char *my_name);
 
 char* Gethostname();
 
-void build_ip_header(char *buff, uint16_t index,uint16_t total_len);
+void build_ip_header(char *buff,uint16_t total_len,char *dest_addr);
 
-void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count);
+void
+populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct tour_route *tour_list);
 
-uint32_t getIpAddressInTourList(uint16_t index);
+char*
+getIpAddressInTourList(struct tour_route *tour_list, uint16_t index);
 
 uint16_t
-calculate_length(int tour_list_len);
+calculate_length();
+
+void
+print_the_payload(struct tour_payload payload);
+
+void
+forward_the_datagram(int sockfd, struct tour_payload payload);
+
+void allocate_buffer(char *buff);
 
 #endif /* SRC_USP_H_ */

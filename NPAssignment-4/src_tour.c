@@ -17,11 +17,13 @@ int main(int argc, char **argv){
 
 	struct ip *ip;
 
-	char *buff = (char *)malloc(1024);
+	char *buff;
 
 	fd_set tour_fds;
 
 	bool SOURCE_IN_TOUR = true;
+
+	struct tour_route tour_list[SIZE_OF_TOUR_LIST];
 
 	/**
 	 *  Current index in the source route
@@ -60,10 +62,12 @@ int main(int argc, char **argv){
 
 
 	if(SOURCE_IN_TOUR){
+
+		allocate_buffer(buff);
 		/**
 		 *  Create a tour_list
 		 */
-		struct tour_route *head = create_tour_list(argc,argv);
+		create_tour_list(argc,argv,tour_list);
 
 
 		if(DEBUG){
@@ -82,19 +86,23 @@ int main(int argc, char **argv){
 
 		Mcast_join(udpsock,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 
-		uint16_t total_len = calculate_length(argc+1);
+		uint16_t total_len = calculate_length();
 
-		build_ip_header(buff,INDEX_IN_TOUR_AT_SOURCE,total_len);
+		build_ip_header(buff,total_len,tour_list[INDEX_IN_TOUR_AT_SOURCE].ip_address);
 
-		populate_data_in_datagram(buff,argc,INDEX_IN_TOUR_AT_SOURCE);
+		populate_data_in_datagram(buff,INDEX_IN_TOUR_AT_SOURCE,argc+1,tour_list);
 
 		struct sockaddr_in destAddr;
 
 		destAddr.sin_family = AF_INET;
 
-		destAddr.sin_addr.s_addr = getIpAddressInTourList(current_index);
+		if(inet_pton(AF_INET,getIpAddressInTourList(tour_list,INDEX_IN_TOUR_AT_SOURCE),&destAddr.sin_addr) < 0){
+			printf("Error in converting numeric format %s\n",strerror(errno));
+		}
 
-		if(sendto(rt,buff,sizeof(buff),0,(SA *)&destAddr,sizeof(destAddr)) < 0){
+		destAddr.sin_port = 0;
+
+		if(sendto(rt,buff,BUFFER_SIZE,0,(SA *)&destAddr,sizeof(struct sockaddr)) < 0){
 			printf("Error in Sendto in %s\n",strerror(errno));
 		}
 	}
@@ -123,10 +131,12 @@ int main(int argc, char **argv){
 
 		if(FD_ISSET(rt,&tour_fds)){
 
-			if(recvfrom(rt,buff,sizeof(buff),0,NULL,NULL) < 0){
+			if(recvfrom(rt,buff,1024,0,NULL,NULL) < 0){
 
 				printf("Received a packet in  %s\n",Gethostname());
 			}
+
+			processed_received_datagram(buff);
 		}
 
 		if(FD_ISSET(pg,&tour_fds)){
@@ -135,7 +145,7 @@ int main(int argc, char **argv){
 
 			if(recvfrom(pg,buff,sizeof(buff),0,NULL,NULL) < 0){
 
-				printf("Received packet in packet socket\n");
+				printf("Error in recvfrom :%s\n",strerror(errno));
 			}
 		}
 	}

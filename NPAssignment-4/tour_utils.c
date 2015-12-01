@@ -9,13 +9,16 @@
 
 char *my_name;
 bool isHostNameFilled = false;
-struct tour_route tour_list[SIZE_OF_TOUR_LIST];
-//struct tour_route *tour_list_rear = NULL;
 
-struct tour_route * create_tour_list(int count , char **argv){
+void allocate_buffer(char *buff){
 
+	buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
+}
+
+void create_tour_list(int count , char **argv, struct tour_route *tour_list){
+
+	tour_list = (struct tour_route*) malloc(sizeof(struct tour_route) * SIZE_OF_TOUR_LIST);
 	int i=0;
-
 	for(i=1; i < count ;i++){
 		struct tour_route route;
 
@@ -28,12 +31,11 @@ struct tour_route * create_tour_list(int count , char **argv){
 		}
 	}
 
-	insert_my_address_at_bgn();
-	insert_multicast_address_at_lst(count);
-	return tour_list;
+	insert_me_address_at_bgn(tour_list);
+	insert_multicast_address_at_lst(count, tour_list);
 }
 
-void insert_my_address_at_bgn(){
+void insert_me_address_at_bgn(struct tour_route *tour_list){
 
 	struct tour_route route;
 	strcpy(route.ip_address,Gethostbyname(Gethostname()));
@@ -49,7 +51,7 @@ void insert_my_address_at_bgn(){
 	}
 }
 
-void insert_multicast_address_at_lst(int count){
+void insert_multicast_address_at_lst(int count, struct tour_route *tour_list){
 
 	if(DEBUG){
 		printf("Inserting at the last in the list\n");
@@ -110,16 +112,17 @@ char* Gethostname(){
 }
 
 
-void build_ip_header(char *buff, uint16_t index,uint16_t total_len){
+void build_ip_header(char *buff,uint16_t total_len,char *dest_addr){
 
-	if(DEBUG)
+	if(DEBUG){
 		printf("Building the IP_Address\n");
+	}
 
 	struct ip *ip = (struct ip *)buff;
 
-	ip->ip_v = htons(IPVERSION);
+	ip->ip_v = IPVERSION;
 
-	ip->ip_hl = htons(sizeof(struct ip) >> 2);
+	ip->ip_hl = sizeof(struct ip) >> 2;
 
 	ip->ip_tos = 0;
 
@@ -129,36 +132,42 @@ void build_ip_header(char *buff, uint16_t index,uint16_t total_len){
 
 	ip->ip_off =  0;
 
-	ip->ip_ttl = htons(1);
+	ip->ip_ttl = MAX_TTL_VALUE;
 
-	ip->ip_p = htons(GRP_PROTOCOL_VALUE);
+	ip->ip_p = GRP_PROTOCOL_VALUE;
 
-	ip->ip_src.s_addr = inet_addr(Gethostbyname(Gethostname()));
 
-	ip->ip_dst.s_addr = getIpAddressInTourList(index);
+	if(inet_pton(AF_INET,dest_addr,&ip->ip_dst) < 0){
+		printf("Error in converting numeric format %s\n",strerror(errno));
+	}
+
+	if(inet_pton(AF_INET,Gethostbyname(Gethostname()),&ip->ip_src) < 0){
+		printf("Error in converting numeric format %s\n",strerror(errno));
+	}
 }
 
-void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count){
+void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct tour_route *tour_list){
 
 	if(DEBUG){
 		printf("Populating the data in the datagram\n");
 	}
 
-	char *ptr = buff + sizeof(struct ip);
+	char *data = buff + IP_HDR_LEN;
 
-	*((uint16_t *) ptr) = htons(index+1);
+	struct tour_payload payload;
 
-	ptr+=2;
+	payload.index = index;
 
-	*((uint16_t *) ptr) = htons(count);
+	payload.count = count;
 
-	ptr+=2;
+	memcpy(payload.tour_list,tour_list,sizeof(tour_list));
 
-	memcpy(ptr,tour_list,sizeof(tour_list));
+	memcpy(data,&payload,sizeof(struct tour_payload));
 }
 
 
-uint32_t getIpAddressInTourList(uint16_t index){
+char*
+getIpAddressInTourList(struct tour_route *tour_list, uint16_t index){
 
 	if(DEBUG)
 		printf("Getting the IpAddress in the tourList\n");
@@ -174,17 +183,78 @@ uint32_t getIpAddressInTourList(uint16_t index){
 			printf("in presentation format %s\n",tour_list[index].ip_address);
 		}
 
-		return inet_addr(tour_list[index].ip_address);
+		return tour_list[index].ip_address;
 	}
 
-	return 0;
+	return NULL;
 }
 
 uint16_t
-calculate_length(int tour_list_len){
+calculate_length(){
 
-	printf("Length %ld\n",(tour_list_len*sizeof(struct tour_route) + 4 + sizeof(struct ip)));
+	printf("Length %ld\n",IP_HDR_LEN + sizeof(struct tour_payload));
 
-	return tour_list_len*sizeof(struct tour_route) + 4 + sizeof(struct ip);
+	return IP_HDR_LEN + sizeof(struct tour_payload);
 }
 
+void processed_received_datagram(int sockfd, char *buff){
+
+	printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
+
+	struct ip *ip_hdr = (struct ip *)buff;
+
+	char *data = buff + IP_HDR_LEN;
+
+	struct tour_payload payload;
+
+	memcpy(&payload,data,sizeof(payload));
+
+	print_the_payload(payload);
+
+	forward_the_datagram(sockfd, payload);
+}
+
+void
+print_the_payload(struct tour_payload payload){
+
+	int i=0;
+
+	printf("Index : %d and Size of list : %d  in received payload\n",payload.index,payload.count);
+
+	printf("printing the received tour\n");
+
+	for(i=0;i<payload.count;i++){
+
+		printf("%s\t",payload.tour_list[i].ip_address);
+	}
+
+	printf("\n");
+}
+
+void
+forward_the_datagram(int sockfd, struct tour_payload payload){
+
+	char *buff;
+
+	allocate_buffer(buff);
+
+	payload.index++;
+
+	build_ip_header(buff,calculate_length(),payload.tour_list[payload.index].ip_address);
+
+	memcpy(buff+IP_HDR_LEN, &payload, sizeof(struct tour_payload));
+
+	struct sockaddr_in destAddr;
+
+	destAddr.sin_family = AF_INET;
+
+	if(inet_pton(AF_INET,getIpAddressInTourList(payload.tour_list,payload.index),&destAddr.sin_addr) < 0){
+		printf("Error in converting numeric format %s\n",strerror(errno));
+	}
+
+	destAddr.sin_port = 0;
+
+	if(sendto(sockfd,buff,BUFFER_SIZE,0,(SA *)&destAddr,sizeof(struct sockaddr)) < 0){
+		printf("Error in Sendto in %s\n",strerror(errno));
+	}
+}
