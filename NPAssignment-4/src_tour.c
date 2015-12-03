@@ -17,7 +17,7 @@ int main(int argc, char **argv){
 
 	struct ip *ip;
 
-	char *buff;
+	char *buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
 
 	fd_set tour_fds;
 
@@ -63,7 +63,7 @@ int main(int argc, char **argv){
 
 	if(SOURCE_IN_TOUR){
 
-		allocate_buffer(buff);
+		//allocate_buffer(&buff);
 		/**
 		 *  Create a tour_list
 		 */
@@ -74,17 +74,7 @@ int main(int argc, char **argv){
 			printf("Completed the creation of tour list\n");
 		}
 
-		bzero(&multi_addr,sizeof(struct sockaddr_in));
-		/**
-		 * Joining the multicast address
-		 */
-		multi_addr.sin_family = AF_INET;
-
-		inet_pton(AF_INET,MULTICAST_ADDRESS,&multi_addr.sin_addr);
-
-		multi_addr.sin_port = MULTICAST_PORT_NUMBER;
-
-		Mcast_join(udpsock,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
+		join_mcast_grp(udpsock);
 
 		uint16_t total_len = calculate_length();
 
@@ -136,7 +126,8 @@ int main(int argc, char **argv){
 				printf("Received a packet in  %s\n",Gethostname());
 			}
 
-			processed_received_datagram(buff);
+			join_mcast_grp(udpsock);
+			process_received_datagram(rt,buff);
 		}
 
 		if(FD_ISSET(pg,&tour_fds)){

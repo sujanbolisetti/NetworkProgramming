@@ -105,6 +105,9 @@ print_the_payload(struct tour_payload payload);
 void
 forward_the_datagram(int sockfd, struct tour_payload payload);
 
-void allocate_buffer(char *buff);
+void allocate_buffer(char **buff);
+
+void process_received_datagram(int sockfd, char *buff);
+
 
 #endif /* SRC_USP_H_ */

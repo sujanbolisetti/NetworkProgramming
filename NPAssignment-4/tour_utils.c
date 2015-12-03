@@ -10,14 +10,15 @@
 char *my_name;
 bool isHostNameFilled = false;
 
-void allocate_buffer(char *buff){
+void allocate_buffer(char **buff){
 
-	buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
+	*buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
 }
 
 void create_tour_list(int count , char **argv, struct tour_route *tour_list){
 
-	tour_list = (struct tour_route*) malloc(sizeof(struct tour_route) * SIZE_OF_TOUR_LIST);
+	//tour_list = (struct tour_route*) malloc(sizeof(struct tour_route) * SIZE_OF_TOUR_LIST);
+
 	int i=0;
 	for(i=1; i < count ;i++){
 		struct tour_route route;
@@ -160,7 +161,12 @@ void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct
 
 	payload.count = count;
 
-	memcpy(payload.tour_list,tour_list,sizeof(tour_list));
+	memcpy(payload.tour_list,tour_list,(sizeof(struct tour_route)*SIZE_OF_TOUR_LIST));
+
+	print_the_payload(payload);
+
+	// TODO
+	//convertToNetworkOrder(&payload);
 
 	memcpy(data,&payload,sizeof(struct tour_payload));
 }
@@ -180,7 +186,7 @@ getIpAddressInTourList(struct tour_route *tour_list, uint16_t index){
 
 		if(DEBUG){
 			printf("In getting the IpAddress bg\n");
-			printf("in presentation format %s\n",tour_list[index].ip_address);
+			printf("in presentation format %d  %s\n",index,tour_list[index].ip_address);
 		}
 
 		return tour_list[index].ip_address;
@@ -197,7 +203,7 @@ calculate_length(){
 	return IP_HDR_LEN + sizeof(struct tour_payload);
 }
 
-void processed_received_datagram(int sockfd, char *buff){
+void process_received_datagram(int sockfd, char *buff){
 
 	printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
 
@@ -211,7 +217,11 @@ void processed_received_datagram(int sockfd, char *buff){
 
 	print_the_payload(payload);
 
-	forward_the_datagram(sockfd, payload);
+	if(payload.index == payload.count-SOURCE_AND_MULTICAST_COUNT){
+		printf("I am last node in the tour\n");
+	}else{
+		forward_the_datagram(sockfd, payload);
+	}
 }
 
 void
@@ -234,9 +244,9 @@ print_the_payload(struct tour_payload payload){
 void
 forward_the_datagram(int sockfd, struct tour_payload payload){
 
-	char *buff;
+	char *buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
 
-	allocate_buffer(buff);
+	//allocate_buffer(&buff);
 
 	payload.index++;
 
@@ -257,4 +267,21 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 	if(sendto(sockfd,buff,BUFFER_SIZE,0,(SA *)&destAddr,sizeof(struct sockaddr)) < 0){
 		printf("Error in Sendto in %s\n",strerror(errno));
 	}
+}
+
+void join_mcast_grp(int udpsock){
+
+	struct sockaddr_in multi_addr;
+
+	bzero(&multi_addr,sizeof(struct sockaddr_in));
+	/**
+	 * Joining the multicast address
+	 */
+	multi_addr.sin_family = AF_INET;
+
+	inet_pton(AF_INET,MULTICAST_ADDRESS,&multi_addr.sin_addr);
+
+	multi_addr.sin_port = MULTICAST_PORT_NUMBER;
+
+	Mcast_join(udpsock,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 }

@@ -28,4 +28,6 @@
 
 #define MAX_TTL_VALUE 255
 
+#define SOURCE_AND_MULTICAST_COUNT 2
+
 #endif /* SRC_CONSTANTS_H_ */
