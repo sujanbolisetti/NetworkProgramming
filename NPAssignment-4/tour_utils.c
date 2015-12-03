@@ -203,7 +203,7 @@ calculate_length(){
 	return IP_HDR_LEN + sizeof(struct tour_payload);
 }
 
-void process_received_datagram(int sockfd, char *buff){
+void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 
 	printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
 
@@ -219,6 +219,8 @@ void process_received_datagram(int sockfd, char *buff){
 
 	if(payload.index == payload.count-SOURCE_AND_MULTICAST_COUNT){
 		printf("I am last node in the tour\n");
+		printf("Sending the multi-cast message as I am last node in the tour\n");
+		send_multicast_msg(udp_sockfd);
 	}else{
 		forward_the_datagram(sockfd, payload);
 	}
@@ -285,3 +287,25 @@ void join_mcast_grp(int udpsock){
 
 	Mcast_join(udpsock,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 }
+
+void send_multicast_msg(int udp_sockfd)
+{
+	char *msg = "Hello Guys, We are part of one group\n";
+	struct sockaddr_in addr;
+	addr.sin_family = AF_INET;
+	addr.sin_port = htons(MULTICAST_PORT_NUMBER);
+	addr.sin_addr.s_addr = inet_addr(MULTICAST_ADDRESS);
+	if(sendto(udp_sockfd, msg, strlen(msg), 0,(SA *) &addr, sizeof(struct sockaddr_in)) < 0)
+	{
+		printf("Error in sending message to multi-cast address %s\n", strerror(errno));
+	}
+	printf("Sent multicast message\n");
+}
+
+/*int get_max_fd(int a, int b)
+{
+	if(a > b)
+		return a;
+	else
+		return b;
+}*/

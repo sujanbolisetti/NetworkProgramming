@@ -107,7 +107,8 @@ forward_the_datagram(int sockfd, struct tour_payload payload);
 
 void allocate_buffer(char **buff);
 
-void process_received_datagram(int sockfd, char *buff);
+void process_received_datagram(int sockfd, int udp_sockfd, char *buff);
 
+void send_multicast_msg(int udp_sockfd);
 
 #endif /* SRC_USP_H_ */

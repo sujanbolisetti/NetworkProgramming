@@ -103,9 +103,11 @@ int main(int argc, char **argv){
 
 		FD_SET(rt, &tour_fds);
 
-		//FD_SET(pg,&tour_fds);
+		FD_SET(pg, &tour_fds);
 
-		maxfd = rt+1;
+		FD_SET(udpsock, &tour_fds);
+
+		maxfd = max(max(rt, udpsock), pg) + 1;
 
 		if(DEBUG){
 			printf("Waiting for the select\n");
@@ -127,7 +129,7 @@ int main(int argc, char **argv){
 			}
 
 			join_mcast_grp(udpsock);
-			process_received_datagram(rt,buff);
+			process_received_datagram(rt, udpsock, buff);
 		}
 
 		if(FD_ISSET(pg,&tour_fds)){
@@ -136,8 +138,22 @@ int main(int argc, char **argv){
 
 			if(recvfrom(pg,buff,sizeof(buff),0,NULL,NULL) < 0){
 
-				printf("Error in recvfrom :%s\n",strerror(errno));
+				printf("Error in recv-from :%s\n",strerror(errno));
 			}
+		}
+
+		if(FD_ISSET(udpsock, &tour_fds))
+		{
+			char udp_msg[BUFFER_SIZE];
+			bzero(&udp_msg, BUFFER_SIZE);
+			printf("Received packet on UDP socket\n");
+
+			if(recvfrom(udpsock,udp_msg,BUFFER_SIZE,0,NULL,NULL) < 0){
+
+				printf("Error in recv-from of udp socket :%s\n",strerror(errno));
+			}
+
+			printf("Received message on udp socket: %s\n", udp_msg);
 		}
 	}
 	return 0;
