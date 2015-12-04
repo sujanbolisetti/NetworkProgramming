@@ -271,41 +271,50 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 	}
 }
 
-void join_mcast_grp(int udpsock){
+void join_mcast_grp(int udpsendsockfd){
 
 	struct sockaddr_in multi_addr;
+//
+//	bzero(&multi_addr,sizeof(struct sockaddr_in));
+//	/**
+//	 * Joining the multicast address
+//	 */
+//	multi_addr.sin_family = AF_INET;
+//
+//	if(inet_pton(AF_INET,MULTICAST_ADDRESS,&multi_addr.sin_addr) < 0){
+//
+//	}
+//
+//	multi_addr.sin_port = htons(MULTICAST_PORT_NUMBER);
 
-	bzero(&multi_addr,sizeof(struct sockaddr_in));
-	/**
-	 * Joining the multicast address
-	 */
-	multi_addr.sin_family = AF_INET;
+	build_multicast_addr(&multi_addr);
 
-	inet_pton(AF_INET,MULTICAST_ADDRESS,&multi_addr.sin_addr);
-
-	multi_addr.sin_port = MULTICAST_PORT_NUMBER;
-
-	Mcast_join(udpsock,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
+	Mcast_join(udpsendsockfd,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 }
 
 void send_multicast_msg(int udp_sockfd)
 {
-	char *msg = "Hello Guys, We are part of one group\n";
-	struct sockaddr_in addr;
-	addr.sin_family = AF_INET;
-	addr.sin_port = htons(MULTICAST_PORT_NUMBER);
-	addr.sin_addr.s_addr = inet_addr(MULTICAST_ADDRESS);
-	if(sendto(udp_sockfd, msg, strlen(msg), 0,(SA *) &addr, sizeof(struct sockaddr_in)) < 0)
+	char msg[128] = "Hello Guys, We are part of one group\n";
+
+	struct sockaddr_in destAddr;
+
+	build_multicast_addr(&destAddr);
+
+	if(sendto(udp_sockfd, msg, strlen(msg), 0,(SA *)&destAddr, sizeof(struct sockaddr_in)) < 0)
 	{
 		printf("Error in sending message to multi-cast address %s\n", strerror(errno));
 	}
 	printf("Sent multicast message\n");
 }
 
-/*int get_max_fd(int a, int b)
-{
-	if(a > b)
-		return a;
-	else
-		return b;
-}*/
+void build_multicast_addr(struct sockaddr_in *multi_addr){
+
+	bzero(multi_addr,sizeof(struct sockaddr_in));
+
+	multi_addr->sin_family = AF_INET;
+	multi_addr->sin_port = htons(MULTICAST_PORT_NUMBER);
+
+	if(inet_pton(AF_INET,MULTICAST_ADDRESS,&multi_addr->sin_addr) < 0){
+		printf("Error in converting numeric format %s\n",strerror(errno));
+	}
+}

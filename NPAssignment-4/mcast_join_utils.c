@@ -28,7 +28,9 @@ mcast_join(int sockfd, const SA *grp, socklen_t grplen,
 	} else
 		req.gr_interface = 0;
 	if (grplen > sizeof(req.gr_group)) {
+
 		errno = EINVAL;
+		printf("Error in Multicast Join %s\n",strerror(errno));
 		return -1;
 	}
 	memcpy(&req.gr_group, grp, grplen);

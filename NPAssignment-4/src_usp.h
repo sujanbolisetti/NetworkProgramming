@@ -54,6 +54,8 @@
 
 #include <stdbool.h>
 
+#include "src_hw_addr.h"
+
 /* include mcast_join1 */
 //	#include	<net/if.h>
 
@@ -73,6 +75,57 @@ struct tour_payload{
 	uint16_t count;
 	struct tour_route tour_list[SIZE_OF_TOUR_LIST];
 };
+
+struct ip_addr_hw_addr_pr{
+
+	char ip_addr[128];
+	unsigned char mac_addr[6];
+	struct ip_addr_hw_addr_pr *next;
+};
+
+struct arp_cache_entry{
+
+	char ip_address[128];
+	unsigned char hw_address[6];
+	uint16_t sll_ifindex;
+	uint16_t sll_hatype;
+	int cli_sockdes;
+
+	struct arp_cache_entry *next;
+};
+
+struct arp_pkt{
+
+	uint16_t iden_field;
+	uint16_t hard_type;
+	uint16_t prot_type;
+	uint8_t hard_size;
+	uint8_t prot_size;
+	uint16_t op;
+	unsigned char snd_ethr_addr[6];
+	char snd_ip_address[128];
+	unsigned char target_ethr_addr[6];
+	char target_ip_address[128];
+};
+
+struct hwaddr {
+
+	int sll_ifindex;
+	unsigned short sll_hatype;
+	unsigned char sll_halen;
+	unsigned char sll_addr[8];
+
+};
+
+struct uds_arp_msg{
+
+	char target_ip_address[128];
+	struct hwaddr hw_addr;
+};
+
+void convertToNetworkOrder(struct arp_pkt *pkt);
+
+void convertToHostOrder(struct arp_pkt *pkt);
 
 void
 create_tour_list(int count , char **argv, struct tour_route *tour_list);
@@ -110,5 +163,30 @@ void allocate_buffer(char **buff);
 void process_received_datagram(int sockfd, int udp_sockfd, char *buff);
 
 void send_multicast_msg(int udp_sockfd);
+
+void build_multicast_addr(struct sockaddr_in *multi_addr);
+
+char *
+Sock_ntop_host(const struct sockaddr *sa, socklen_t salen);
+
+void printHWADDR(char *hw_addr);
+
+void process_arp_rep(struct arp_pkt *pkt);
+
+void process_arp_req(int pf_sockfd,struct arp_pkt *pkt,int recv_if_index);
+
+void build_eth_frame(void *buffer,char *dest_mac,
+			char *src_mac,int inf_index,
+			struct sockaddr_ll *addr_ll,struct arp_pkt *pkt, int eth_pkt_type);
+
+void send_arp_reply(int pf_sockfd,struct arp_pkt *pkt);
+
+void update_arp_cache(unsigned char *eth_addr,char *ip_address,int recv_if_index,int cli_sock_desc);
+
+void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType);
+
+bool arp_req_is_for_me(char *ip_address);
+
+struct arp_cache_entry* get_hw_addr_arp_cache(char *ip_address);
 
 #endif /* SRC_USP_H_ */

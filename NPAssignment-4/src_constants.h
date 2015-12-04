@@ -12,7 +12,7 @@
 
 #define DEBUG 1
 
-#define MULTICAST_ADDRESS "224.0.0.2"
+#define MULTICAST_ADDRESS "224.0.0.224"
 
 #define MULTICAST_PORT_NUMBER 32765
 
@@ -29,5 +29,29 @@
 #define MAX_TTL_VALUE 255
 
 #define SOURCE_AND_MULTICAST_COUNT 2
+
+#define SERVER_WELL_KNOWN_PATH_NAME "/tmp/sujan_sthota.dg"
+
+#define ARP_GRP_TYPE 1800
+
+#define ETH_HDR_LEN 14
+
+#define ETHR_FRAME_TYPE 0x0806
+
+#define BACKLOG 1024
+
+#define EHTR_FRAME_SIZE sizeof(struct arp_pkt) +14
+
+#define ARP_REQ 1
+
+#define ARP_REP 2
+
+#define ETH_HA_TYPE 1
+
+#define INVALID_RECV_IF_INDEX -1
+
+#define INVALID_SOCK_DESC -1
+
+#define ETH0_INDEX 2
 
 #endif /* SRC_CONSTANTS_H_ */

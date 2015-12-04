@@ -9,7 +9,7 @@
 
 int main(int argc, char **argv){
 
-	int rt,pg,pf,udpsock;
+	int rt,pg,pf,udpsock,udprecvsockfd;
 
 	int on = 1,maxfd;
 
@@ -56,10 +56,19 @@ int main(int argc, char **argv){
 
 
 	/**
-	 * Creating a UDP socket
+	 * Creating a UDP socket for sending
 	 */
 	udpsock = Socket(AF_INET,SOCK_DGRAM,0);
 
+	/**
+	 * Creating a UDP socket for receiving
+	 */
+	udprecvsockfd = Socket(AF_INET,SOCK_DGRAM,0);
+
+
+	build_multicast_addr(&multi_addr);
+
+	Bind(udprecvsockfd,(SA *)&multi_addr,sizeof(struct sockaddr_in));
 
 	if(SOURCE_IN_TOUR){
 
@@ -74,7 +83,7 @@ int main(int argc, char **argv){
 			printf("Completed the creation of tour list\n");
 		}
 
-		join_mcast_grp(udpsock);
+		join_mcast_grp(udprecvsockfd);
 
 		uint16_t total_len = calculate_length();
 
@@ -103,11 +112,11 @@ int main(int argc, char **argv){
 
 		FD_SET(rt, &tour_fds);
 
-		FD_SET(pg, &tour_fds);
+		//FD_SET(pg, &tour_fds);
 
-		FD_SET(udpsock, &tour_fds);
+		FD_SET(udprecvsockfd, &tour_fds);
 
-		maxfd = max(max(rt, udpsock), pg) + 1;
+		maxfd = max(max(rt, udprecvsockfd), pg) + 1;
 
 		if(DEBUG){
 			printf("Waiting for the select\n");
@@ -128,7 +137,7 @@ int main(int argc, char **argv){
 				printf("Received a packet in  %s\n",Gethostname());
 			}
 
-			join_mcast_grp(udpsock);
+			join_mcast_grp(udprecvsockfd);
 			process_received_datagram(rt, udpsock, buff);
 		}
 
@@ -142,13 +151,13 @@ int main(int argc, char **argv){
 			}
 		}
 
-		if(FD_ISSET(udpsock, &tour_fds))
+		if(FD_ISSET(udprecvsockfd, &tour_fds))
 		{
 			char udp_msg[BUFFER_SIZE];
 			bzero(&udp_msg, BUFFER_SIZE);
 			printf("Received packet on UDP socket\n");
 
-			if(recvfrom(udpsock,udp_msg,BUFFER_SIZE,0,NULL,NULL) < 0){
+			if(recvfrom(udprecvsockfd,udp_msg,BUFFER_SIZE,0,NULL,NULL) < 0){
 
 				printf("Error in recv-from of udp socket :%s\n",strerror(errno));
 			}
