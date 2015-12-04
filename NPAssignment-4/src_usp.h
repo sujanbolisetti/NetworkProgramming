@@ -189,4 +189,12 @@ bool arp_req_is_for_me(char *ip_address);
 
 struct arp_cache_entry* get_hw_addr_arp_cache(char *ip_address);
 
+int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr);
+
+int
+Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+       struct timeval *timeout);
+
+void ping_predecessor();
+
 #endif /* SRC_USP_H_ */

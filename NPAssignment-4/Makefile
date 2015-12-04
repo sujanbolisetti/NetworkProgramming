@@ -10,8 +10,8 @@ DEPS =  src_usp.h src_constants.h
 
 all: src_tour src_arp
 
-src_tour: src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o
-	${CC} ${FLAGS} src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o -o src_tour ${LIBS}
+src_tour: src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o
+	${CC} ${FLAGS} src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o -o src_tour ${LIBS}
 	
 src_arp: src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o
 	${CC} ${FLAGS} src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o -o src_arp ${LIBS}

@@ -150,9 +150,15 @@ void build_eth_frame(void *buffer,char *dest_mac,
 
 	memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
 	memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
-	eh->h_proto = ETHR_FRAME_TYPE;
+	eh->h_proto = htons(ARP_GRP_TYPE);
 
 	memcpy(addr_ll->sll_addr,(void*)dest_mac, ETH_ALEN);
+
+	printf("Destination and src mac address\n");
+
+	printHWADDR(dest_mac);
+
+	printHWADDR(src_mac);
 
 	/**
 	 *  blanking out the last two values.
@@ -161,7 +167,6 @@ void build_eth_frame(void *buffer,char *dest_mac,
 	addr_ll->sll_addr[7] = 0x00;
 
 	memcpy(data,pkt,sizeof(struct arp_pkt));
-
 }
 
 void process_arp_req(int pf_sockfd,struct arp_pkt *pkt,int recv_if_index){
@@ -259,7 +264,7 @@ void send_arp_reply(int pf_sockfd,struct arp_pkt *pkt){
 
 	pkt->op = ARP_REP;
 
-	build_eth_frame(buff,pkt->snd_ethr_addr,my_hw_addr_head->mac_addr,ETH0_INDEX,&addr_ll,pkt,PACKET_OTHERHOST);
+	build_eth_frame(buff,pkt->target_ethr_addr,my_hw_addr_head->mac_addr,ETH0_INDEX,&addr_ll,pkt,PACKET_OTHERHOST);
 
 	Sendto(pf_sockfd,buff,addr_ll,"ARP_REPLY");
 
@@ -271,8 +276,6 @@ void update_arp_cache(unsigned char *eth_addr,char *ip_address,int recv_if_index
 	struct arp_cache_entry *cache_entry = (struct arp_cache_entry *)malloc(sizeof(struct arp_cache_entry));
 
 	printf("Updaing the ARP_CACHE at node %s\n",Gethostname());
-
-//	struct arp_cache_entry *temp;
 
 	if(eth_addr != NULL){
 		memcpy(cache_entry->hw_address,eth_addr,ETH_ALEN);
@@ -361,4 +364,6 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 		printf("ODR at node %s : In sending %s received an error %s\n",Gethostname(),sendType, strerror(errno));
 		exit(-1);
 	}
+
+	printf("Sent a pkt type %s\n",sendType);
 }

@@ -37,9 +37,9 @@ int main(){
 
 	arp_addr.sun_family = AF_LOCAL;
 
-	strcpy(arp_addr.sun_path,SERVER_WELL_KNOWN_PATH_NAME);
+	strcpy(arp_addr.sun_path,ARP_WELL_KNOWN_PATH_NAME);
 
-	unlink(SERVER_WELL_KNOWN_PATH_NAME);
+	unlink(ARP_WELL_KNOWN_PATH_NAME);
 
 	Bind(unix_sockfd,(SA *)&arp_addr,sizeof(struct sockaddr_un));
 
@@ -95,8 +95,6 @@ int main(){
 				update_arp_cache(NULL,uds_msg.target_ip_address,INVALID_RECV_IF_INDEX,cli_uds_connfd);
 				send_arp_req(pf_sockfd,uds_msg.target_ip_address);
 			}
-
-			close(cli_uds_connfd);
 		}
 
 		//TODO : have to check the identification field before processing the frame.

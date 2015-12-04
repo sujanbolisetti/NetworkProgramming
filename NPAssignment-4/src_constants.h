@@ -30,7 +30,7 @@
 
 #define SOURCE_AND_MULTICAST_COUNT 2
 
-#define SERVER_WELL_KNOWN_PATH_NAME "/tmp/sujan_sthota.dg"
+#define ARP_WELL_KNOWN_PATH_NAME "/tmp/sujan_sthota.dg"
 
 #define ARP_GRP_TYPE 1800
 

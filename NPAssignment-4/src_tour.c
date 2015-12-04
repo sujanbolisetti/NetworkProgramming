@@ -139,6 +139,7 @@ int main(int argc, char **argv){
 
 			join_mcast_grp(udprecvsockfd);
 			process_received_datagram(rt, udpsock, buff);
+			ping_predecessor();
 		}
 
 		if(FD_ISSET(pg,&tour_fds)){
