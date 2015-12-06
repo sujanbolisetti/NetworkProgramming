@@ -15,25 +15,34 @@ void allocate_buffer(char **buff){
 	*buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
 }
 
-void create_tour_list(int count , char **argv, struct tour_route *tour_list){
+bool create_tour_list(int count , char **argv, struct tour_route *tour_list){
 
-	//tour_list = (struct tour_route*) malloc(sizeof(struct tour_route) * SIZE_OF_TOUR_LIST);
-
+	char prev_vm[10] = "\0";
 	int i=0;
 	for(i=1; i < count ;i++){
-		struct tour_route route;
+		if(strcmp(prev_vm, argv[i]))
+		{
+			struct tour_route route;
+			strcpy(route.ip_address , Gethostbyname(argv[i]));
+			tour_list[i] = route;
 
-		strcpy(route.ip_address ,Gethostbyname(argv[i]));
+			if(DEBUG){
+				printf("Inserted in the list \n");
+				printf("in presentation format %s\n",route.ip_address);
+			}
 
-		tour_list[i] = route;
-		if(DEBUG){
-			printf("Inserted in the list \n");
-			printf("in presentation format %s\n",route.ip_address);
+			strcpy(prev_vm, argv[i]);
+		}
+		else
+		{
+			return true;
 		}
 	}
 
 	insert_me_address_at_bgn(tour_list);
 	insert_multicast_address_at_lst(count, tour_list);
+
+	return false;
 }
 
 void insert_me_address_at_bgn(struct tour_route *tour_list){
@@ -112,8 +121,26 @@ char* Gethostname(){
 	return my_name;
 }
 
+void send_icmp_echo(int sockfd, char *buff, char *dest_addr_ip, char *dest_mac) {
+	char *data = buff + IP_HDR_LEN;
+	struct icmp *icmp = (struct icmp *)data;
+	struct sockaddr_ll addr_ll;
+	extern struct ip_addr_hw_addr_pr* my_hw_addr_head;
 
-void build_ip_header(char *buff,uint16_t total_len,char *dest_addr){
+	icmp->icmp_type = ICMP_ECHOREPLY;
+	icmp->icmp_code = 0;
+	icmp->icmp_cksum = 0;
+	icmp->icmp_id = ICMP_IDENTIFIER;
+
+	build_ip_header(buff, IP_HDR_LEN + 8, dest_addr_ip, false);
+
+	char *eth_buff = (char *)malloc(ETHR_FRAME_SIZE_IP * sizeof(char));
+	build_eth_frame_ip(eth_buff, dest_mac, my_hw_addr_head->mac_addr, ETH0_INDEX, &addr_ll, (struct ip*)buff, PACKET_OTHERHOST);
+
+	Sendto(sockfd, buff, addr_ll,"ICMP_ECHO");
+}
+
+void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp){
 
 	if(DEBUG){
 		printf("Building the IP_Address\n");
@@ -135,7 +162,10 @@ void build_ip_header(char *buff,uint16_t total_len,char *dest_addr){
 
 	ip->ip_ttl = MAX_TTL_VALUE;
 
-	ip->ip_p = GRP_PROTOCOL_VALUE;
+	if(isIcmp)
+		ip->ip_p = IPPROTO_ICMP;
+	else
+		ip->ip_p = GRP_PROTOCOL_VALUE;
 
 
 	if(inet_pton(AF_INET,dest_addr,&ip->ip_dst) < 0){
@@ -252,7 +282,7 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 
 	payload.index++;
 
-	build_ip_header(buff,calculate_length(),payload.tour_list[payload.index].ip_address);
+	build_ip_header(buff,calculate_length(),payload.tour_list[payload.index].ip_address, false);
 
 	memcpy(buff+IP_HDR_LEN, &payload, sizeof(struct tour_payload));
 
@@ -388,7 +418,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 
 
-void ping_predecessor(){
+void get_predecessor_mac(char *ip_addr, struct hwaddr *hw_addr){
 
 	printf("came into pinging the packet\n");
 
@@ -396,15 +426,13 @@ void ping_predecessor(){
 
 	pred_addr.sin_family = AF_INET;
 
-	inet_pton(AF_INET,"130.245.156.21",&pred_addr.sin_addr);
+	inet_pton(AF_INET, ip_addr, &pred_addr.sin_addr);
 
-	struct hwaddr hw_addr;
+	hw_addr->sll_halen = ETH_ALEN;
+	hw_addr->sll_ifindex = ETH0_INDEX;
+	hw_addr->sll_hatype = ETH_HA_TYPE;
 
-	hw_addr.sll_halen = ETH_ALEN;
-	hw_addr.sll_ifindex = ETH0_INDEX;
-	hw_addr.sll_hatype = ETH_HA_TYPE;
-
-	areq((SA *)&pred_addr,sizeof(struct sockaddr_in),&hw_addr);
+	areq((SA *)&pred_addr,sizeof(struct sockaddr_in), hw_addr);
 }
 
 

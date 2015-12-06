@@ -16,6 +16,8 @@
 
 #include<netinet/ip.h>
 
+#include<netinet/ip_icmp.h>
+
 #include<arpa/inet.h>
 
 #include<errno.h>
@@ -123,11 +125,18 @@ struct uds_arp_msg{
 	struct hwaddr hw_addr;
 };
 
+struct icmp_tour_node {
+	char ip_address[128];
+	struct icmp_tour_node *next;
+};
+
+int pf_sockfd;
+
 void convertToNetworkOrder(struct arp_pkt *pkt);
 
 void convertToHostOrder(struct arp_pkt *pkt);
 
-void
+bool
 create_tour_list(int count , char **argv, struct tour_route *tour_list);
 
 void
@@ -141,7 +150,7 @@ Gethostbyname(char *my_name);
 
 char* Gethostname();
 
-void build_ip_header(char *buff,uint16_t total_len,char *dest_addr);
+void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp);
 
 void
 populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct tour_route *tour_list);
@@ -196,5 +205,16 @@ Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
        struct timeval *timeout);
 
 void ping_predecessor();
+
+void sig_alrm_handler(int signum);
+
+// ICMP related
+void add_prev_node(char *ip_addr);
+bool is_prev_node_in_list(char* ip_addr);
+void send_icmp_echoes();
+
+void build_eth_frame_ip(void *buffer,char *dest_mac,
+			char *src_mac,int inf_index,
+			struct sockaddr_ll *addr_ll, struct ip *pkt, int eth_pkt_type);
 
 #endif /* SRC_USP_H_ */

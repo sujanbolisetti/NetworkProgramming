@@ -100,7 +100,7 @@ int main(){
 		//TODO : have to check the identification field before processing the frame.
 		if(FD_ISSET(pf_sockfd,&arp_fds)){
 
-			void* buffer = (void*)malloc(EHTR_FRAME_SIZE);
+			void* buffer = (void*)malloc(ETHR_FRAME_SIZE);
 
 			bzero(&addr_ll,sizeof(addr_ll));
 
@@ -108,7 +108,7 @@ int main(){
 			unsigned char src_mac_addr[6];
 			unsigned char dest_mac_addr[6];
 
-			if(recvfrom(pf_sockfd, buffer, EHTR_FRAME_SIZE, 0,(SA *)&addr_ll,&addr_len) < 0){
+			if(recvfrom(pf_sockfd, buffer, ETHR_FRAME_SIZE, 0,(SA *)&addr_ll,&addr_len) < 0){
 				printf("Error in recv_from :%s\n",strerror(errno));
 				exit(0);
 			}

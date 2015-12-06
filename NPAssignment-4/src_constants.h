@@ -40,7 +40,9 @@
 
 #define BACKLOG 1024
 
-#define EHTR_FRAME_SIZE sizeof(struct arp_pkt) +14
+#define ETHR_FRAME_SIZE sizeof(struct arp_pkt) + 14
+
+#define ETHR_FRAME_SIZE_IP sizeof(struct ip) + 14
 
 #define ARP_REQ 1
 
@@ -53,5 +55,7 @@
 #define INVALID_SOCK_DESC -1
 
 #define ETH0_INDEX 2
+
+#define ICMP_IDENTIFIER 7212
 
 #endif /* SRC_CONSTANTS_H_ */

@@ -10,8 +10,8 @@ DEPS =  src_usp.h src_constants.h
 
 all: src_tour src_arp
 
-src_tour: src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o
-	${CC} ${FLAGS} src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o -o src_tour ${LIBS}
+src_tour: src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o icmp_utils.o
+	${CC} ${FLAGS} src_tour.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o icmp_utils.o -o src_tour ${LIBS}
 	
 src_arp: src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o
 	${CC} ${FLAGS} src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o -o src_arp ${LIBS}
@@ -37,6 +37,8 @@ mcast_join_utils.o: mcast_join_utils.c
 utils_wrapsock.o: utils_wrapsock.c
 	${CC} ${CFLAGS} -c utils_wrapsock.c	
 	
+icmp_utils.o: icmp_utils.c
+	${CC} ${CFLAGS} -c icmp_utils.c	
 
 clean:
 	rm src_tour src_arp *.o

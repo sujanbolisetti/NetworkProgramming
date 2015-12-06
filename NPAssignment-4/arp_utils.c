@@ -127,7 +127,7 @@ struct arp_pkt* build_arp_pkt(int pkt_type, unsigned char *snd_hw_addr,
 
 void build_eth_frame(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
-			struct sockaddr_ll *addr_ll,struct arp_pkt *pkt, int eth_pkt_type){
+			struct sockaddr_ll *addr_ll, struct arp_pkt *pkt, int eth_pkt_type){
 
 
 	printf("Building ETHR FRAME at node %s\n",Gethostname());
@@ -167,6 +167,48 @@ void build_eth_frame(void *buffer,char *dest_mac,
 	addr_ll->sll_addr[7] = 0x00;
 
 	memcpy(data,pkt,sizeof(struct arp_pkt));
+}
+
+void build_eth_frame_ip(void *buffer,char *dest_mac,
+			char *src_mac,int inf_index,
+			struct sockaddr_ll *addr_ll, struct ip *pkt, int eth_pkt_type){
+
+
+	printf("Building ETHR FRAME at node %s\n",Gethostname());
+
+	bzero(addr_ll,sizeof(*addr_ll));
+
+	unsigned char* etherhead = buffer;
+
+	unsigned char* data = buffer + ETH_HDR_LEN;
+
+	struct ethhdr *eh = (struct ethhdr *)etherhead;
+
+	addr_ll->sll_family   = AF_PACKET;
+	addr_ll->sll_ifindex  = inf_index;
+	addr_ll->sll_pkttype  = eth_pkt_type;
+	addr_ll->sll_protocol = ETH_P_IP;
+	addr_ll->sll_halen    = ETH_ALEN;
+
+	memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
+	memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
+	eh->h_proto = htons(ARP_GRP_TYPE);
+
+	memcpy(addr_ll->sll_addr,(void*)dest_mac, ETH_ALEN);
+
+	printf("Destination and src mac address\n");
+
+	printHWADDR(dest_mac);
+
+	printHWADDR(src_mac);
+
+	/**
+	 *  blanking out the last two values.
+	 */
+	addr_ll->sll_addr[6] = 0x00;
+	addr_ll->sll_addr[7] = 0x00;
+
+	memcpy(data,pkt,sizeof(struct ip));
 }
 
 void process_arp_req(int pf_sockfd,struct arp_pkt *pkt,int recv_if_index){
@@ -231,7 +273,7 @@ void send_arp_req(int pf_sockfd,char *target_ip_addr){
 
 	struct sockaddr_ll addr_ll;
 
-	char *buff = (char*)malloc(EHTR_FRAME_SIZE);
+	char *buff = (char*)malloc(ETHR_FRAME_SIZE);
 
 	pkt = build_arp_pkt(ARP_REQ,my_hw_addr_head->mac_addr,my_hw_addr_head->ip_addr,target_ip_addr);
 
@@ -242,7 +284,7 @@ void send_arp_req(int pf_sockfd,char *target_ip_addr){
 
 void send_arp_reply(int pf_sockfd,struct arp_pkt *pkt){
 
-	char *buff = (char *)malloc(EHTR_FRAME_SIZE);
+	char *buff = (char *)malloc(ETHR_FRAME_SIZE);
 
 	struct sockaddr_ll addr_ll;
 
@@ -275,7 +317,7 @@ void update_arp_cache(unsigned char *eth_addr,char *ip_address,int recv_if_index
 
 	struct arp_cache_entry *cache_entry = (struct arp_cache_entry *)malloc(sizeof(struct arp_cache_entry));
 
-	printf("Updaing the ARP_CACHE at node %s\n",Gethostname());
+	printf("Updating the ARP_CACHE at node %s\n",Gethostname());
 
 	if(eth_addr != NULL){
 		memcpy(cache_entry->hw_address,eth_addr,ETH_ALEN);
@@ -353,13 +395,12 @@ void convertToHostOrder(struct arp_pkt *pkt){
 	pkt->op = ntohs(pkt->op);
 }
 
-
 /**
- *  Wrappe method for sending the packet.
+ *  Wrapper method for sending the packet.
  */
 void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendType)
 {
-	if(sendto(pf_sockfd,buffer,EHTR_FRAME_SIZE,0,
+	if(sendto(pf_sockfd,buffer,ETHR_FRAME_SIZE,0,
 					(SA *)&addr_ll,sizeof(addr_ll)) < 0){
 		printf("ODR at node %s : In sending %s received an error %s\n",Gethostname(),sendType, strerror(errno));
 		exit(-1);
