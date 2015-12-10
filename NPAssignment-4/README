@@ -1,0 +1,45 @@
+GROUP MEMBERS:
+-------------
+        Sujan Bolisetti (109797364) (NetId: sbolisetti)
+        Sidhartha Thota (109888134) (NetId: sthota)
+-----------------------------------------------------------------------------------------------------
+
+COMPILING THE PROJECT:
+----------------------
+
+Pre-requisites:
+1. Make
+2. GCC compiler
+
+Compiling on Minix:
+1.mkdir NPAssignment-4
+2.Download all the files under Assignment-4 in blackboard in the created directory in step-1.
+3.Compile the project using "make all" command.
+4.All the executables will be created in the same directory.
+
+
+RUNNING THE PROJECT:
+--------------------
+Before running the project, it needs to be compiled (Instructions to compile the project)
+Kindly use deploy_app application to push the executables with names
+1. src_tour_sbolisetti_sthota [tour application]
+2. src_arp_sbolisetti_sthota [Arp Module]
+
+Starting tour application:
+-------------------------
+	You can start the tour application by running this command './src_tour_sbolisetti_sthota'. The tour application at the source node should be started by list of the node names in the tour as arguments. 
+		Eg: ./src_tour_sbolisetti_sthota vm2 vm3 ==> So here the tour nodes are vm2 and vm3.
+
+Starting Arp Module:
+--------------------
+	You can start the arp module by running the command './src_arp_sbolisetti_sthota'
+
+Tour Application:
+
+1. The tour application creates five sockets.
+
+
+
+
+
+

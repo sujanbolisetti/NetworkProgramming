@@ -12,7 +12,7 @@
 
 #define DEBUG 0
 
-#define TIME_OUT_FOR_MULTICAST 10
+#define TIME_OUT_FOR_MULTICAST 5
 
 #define MULTICAST_ADDRESS "225.0.1.224"
 
@@ -61,5 +61,7 @@
 #define ICMP_DATA_LEN 100
 
 #define ICMP_IDENTIFIER 7212
+
+#define ARP_IDEN_FIELD 6789
 
 #endif /* SRC_CONSTANTS_H_ */

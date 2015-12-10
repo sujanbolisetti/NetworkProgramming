@@ -28,6 +28,8 @@ int main(int argc, char **argv){
 
 	fd_set tour_fds;
 
+	printf("Starting the tour application at node :%s\n",Gethostname());
+
 	bool SOURCE_IN_TOUR = true;
 
 	struct tour_route tour_list[SIZE_OF_TOUR_LIST];
@@ -102,12 +104,14 @@ int main(int argc, char **argv){
 		if(is_list_bad)
 		{
 			printf("Input VMs list is having consecutive duplicate, please check and start program again\n");
-			return 0;
+			exit(0);
 		}
 
 		if(DEBUG){
 			printf("Completed the creation of tour list\n");
 		}
+
+		printf("%s is starting the tour\n",Gethostname());
 
 		join_mcast_grp(udprecvsockfd);
 
@@ -126,6 +130,14 @@ int main(int argc, char **argv){
 		}
 
 		destAddr.sin_port = 0;
+
+		char next_vm_name[20];
+
+		memset(next_vm_name,'\0',20);
+
+		strcpy(next_vm_name,Gethostbyaddr(getIpAddressInTourList(tour_list,INDEX_IN_TOUR_AT_SOURCE)));
+
+		printf("%s is sending the source routing packet to next node in the tour %s\n",Gethostname(),next_vm_name);
 
 		if(sendto(rt,buff,BUFFER_SIZE,0,(SA *)&destAddr,sizeof(struct sockaddr)) < 0){
 			printf("Error in Sendto in %s\n",strerror(errno));
@@ -233,12 +245,14 @@ int main(int argc, char **argv){
 			/**
 			 *  Checking the packet type and identification field.
 			 */
-			if(ntohs(icmp->icmp_id) == ICMP_IDENTIFIER && icmp->icmp_type == ICMP_ECHO)
+			if(icmp->icmp_id == ICMP_IDENTIFIER && icmp->icmp_type == ICMP_ECHOREPLY)
 			{
 				//printf("Received ping from next node %s\n", p_addr);
 
-				printf("%d bytes from %s (%s): icmp_seq:%u, ttl=%d\n",
+				printf("%d bytes from %s (%s): icmp_seq:%u, ttl=%u\n",
 																	ICMP_DATA_LEN,Gethostbyaddr(p_addr),p_addr,icmp->icmp_seq,ip->ip_ttl);
+			}else{
+				//printf("Received a ping but identification filed mismacth %u\n",icmp->icmp_type);
 			}
 
 

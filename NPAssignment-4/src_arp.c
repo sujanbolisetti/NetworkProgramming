@@ -21,7 +21,9 @@ int main(){
 
 	char *recvbuff = (char *)malloc(BUFFER_SIZE);
 
-	printf("Got the hw_addr's\n");
+	//printf("Got the hw_addr's\n");
+
+	printf("Starting the arp-module at node :%s\n",Gethostname());
 
 	create_ip_hw_mp(head);
 
@@ -55,6 +57,9 @@ int main(){
 
 		int maxfd = max(unix_sockfd,pf_sockfd) + 1;
 
+		if(DEBUG)
+			printf("Waiting in select\n");
+
 		Select(maxfd,&arp_fds,NULL,NULL,NULL);
 
 		if(FD_ISSET(unix_sockfd,&arp_fds)){
@@ -65,27 +70,29 @@ int main(){
 
 			memset(recvbuff,0,BUFFER_SIZE);
 
-			printf("Before Recv_from  \n");
+			//printf("Before Recv_from  \n");
 
 			if(recvfrom(cli_uds_connfd,recvbuff,BUFFER_SIZE,0,NULL,NULL) < 0 ){
 				printf("Error in Recv from %s\n",strerror(errno));
 			}
 
-			printf("After Recv_from -1 \n");
+			//printf("After Recv_from -1 \n");
 			bzero(&uds_msg,sizeof(uds_msg));
-			printf("After Recv_from -2 \n");
+			//printf("After Recv_from -2 \n");
 
 
 
-			printf("After Recv_from -3 \n");
+			//printf("After Recv_from -3 \n");
 
 			memcpy(&uds_msg,recvbuff,strlen(recvbuff));
 
-			printf("received target_ip_address request %s\n",uds_msg.target_ip_address);
+			//printf("received target_ip_address request %s\n",uds_msg.target_ip_address);
 
 			if((arp_entry = get_hw_addr_arp_cache(uds_msg.target_ip_address)) != NULL){
 
-				printf("ARP ENTRY exists for ip_address %s\n",uds_msg.target_ip_address);
+				printf("ARP ENTRY exists for ip_address in arp_cache %s\n",uds_msg.target_ip_address);
+
+				printf("Sending the requested mac-address for ip-address %s in unix domain socket \n",uds_msg.target_ip_address);
 
 				bzero(&uds_msg,sizeof(uds_msg));
 
@@ -97,13 +104,11 @@ int main(){
 					printf("Error in Sendto in arp module %s\n",strerror(errno));
 				}
 
-				print_arp_cache();
-
 			}else{
 
-				printf("ARP ENTRY does not exists for ip_address %s\n",uds_msg.target_ip_address);
+				printf("ARP ENTRY does not exists for ip_address in arp_cache %s\n",uds_msg.target_ip_address);
 
-				update_arp_cache(NULL,uds_msg.target_ip_address,INVALID_RECV_IF_INDEX,cli_uds_connfd);
+				update_arp_cache(NULL,uds_msg.target_ip_address,ETH0_INDEX,cli_uds_connfd);
 				send_arp_req(pf_sockfd,uds_msg.target_ip_address);
 			}
 		}
@@ -131,16 +136,19 @@ int main(){
 
 			convertToHostOrder(pkt);
 
-			switch(pkt->op){
+			if(pkt->iden_field == ARP_IDEN_FIELD){
+				switch(pkt->op){
 
-				case ARP_REQ:
-					printf("Received an arp req at node %s on index %d\n",Gethostname(),addr_ll.sll_ifindex);
-					process_arp_req(pf_sockfd,pkt,addr_ll.sll_ifindex);
-					break;
-				case ARP_REP:
-					printf("Received an arp_reply at node %s\n",Gethostname());
-					process_arp_rep(pkt);
-					break;
+					case ARP_REQ:
+						process_arp_req(pf_sockfd,pkt,addr_ll.sll_ifindex);
+						break;
+					case ARP_REP:
+						printf("Received an arp_reply at node %s\n",Gethostname());
+						process_arp_rep(pkt);
+						break;
+				}
+			}else{
+				printf("Ignoring the ARP message as the identification field didn't match\n");
 			}
 
 		}

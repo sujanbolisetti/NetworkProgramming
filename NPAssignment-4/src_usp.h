@@ -238,4 +238,6 @@ void print_arp_cache();
 
 void sig_alrm_handler_termination(int signum);
 
+void printHWADDR_ARP(char *hw_addr);
+
 #endif /* SRC_USP_H_ */

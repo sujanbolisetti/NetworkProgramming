@@ -122,9 +122,11 @@ char* Gethostname(){
 
 void send_icmp_echo(int sockfd, char *dest_addr_ip,struct hwaddr hw_addr,int seqNum) {
 
-	char *buff = malloc(IP_HDR_LEN + ICMP_HDR_LEN + ICMP_DATA_LEN);
+	char *buff = (char *)malloc(IP_HDR_LEN + ICMP_HDR_LEN + ICMP_DATA_LEN);
 
-	build_ip_header(buff, IP_HDR_LEN+8, dest_addr_ip, true);
+	memset(buff,'\0',IP_HDR_LEN + ICMP_HDR_LEN + ICMP_DATA_LEN);
+
+	build_ip_header(buff, IP_HDR_LEN+ICMP_HDR_LEN+ICMP_DATA_LEN, dest_addr_ip, true);
 
 	char *icmp_hdr = buff + IP_HDR_LEN;
 
@@ -135,16 +137,18 @@ void send_icmp_echo(int sockfd, char *dest_addr_ip,struct hwaddr hw_addr,int seq
 	/**
 	 * Setting dummy data for sending the ping
 	 */
-	memset(data_icmp,'q',ICMP_DATA_LEN);
+	memset(data_icmp,0xff,ICMP_DATA_LEN);
 
 	bzero(&addr_ll,sizeof(addr_ll));
 
 	icmp->icmp_seq = seqNum;
 	icmp->icmp_type = ICMP_ECHO;
 	icmp->icmp_code = 0;
+	icmp->icmp_id = ICMP_IDENTIFIER;
+	memcpy(icmp->icmp_data,data_icmp,ICMP_DATA_LEN);
 	icmp->icmp_cksum = 0;
-	icmp->icmp_id = htons(ICMP_IDENTIFIER);
 	icmp->icmp_cksum = in_cksum((u_short *)icmp,ICMP_HDR_LEN + ICMP_DATA_LEN);
+
 
 	if(DEBUG)
 		printf("Sending ICMP Echo message to %s\n",dest_addr_ip);
@@ -200,14 +204,13 @@ void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp
 	ip->ip_off =  0;
 
 	if(isIcmp){
-		ip->ip_ttl = 1;
 		ip->ip_p = IPPROTO_ICMP;
 	}
 	else{
-		ip->ip_ttl = MAX_TTL_VALUE;
 		ip->ip_p = GRP_PROTOCOL_VALUE;
 	}
 
+	ip->ip_ttl = MAX_TTL_VALUE;
 	if(inet_pton(AF_INET,dest_addr,&ip->ip_dst) < 0){
 		printf("Error in converting numeric format %s\n",strerror(errno));
 	}
@@ -218,7 +221,7 @@ void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp
 
 	ip->ip_sum = 0;
 
-	ip->ip_sum = in_cksum((u_short *)ip,(IP_HDR_LEN+8));//htons(0x7d9e);//in_cksum((u_short *)ip,IP_HDR_LEN);
+	ip->ip_sum = in_cksum((u_short *)ip,total_len);//htons(0x7d9e);//in_cksum((u_short *)ip,IP_HDR_LEN);
 
 }
 
@@ -291,7 +294,7 @@ void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 
 	time_t ticks = time(NULL);
 
-	snprintf(time_buff, sizeof(time_buff), "%.24s\r\n" , ctime(&ticks));
+	snprintf(time_buff, sizeof(time_buff), "%.24s " , ctime(&ticks));
 
 	struct ip *ip_hdr = (struct ip *)buff;
 
@@ -347,7 +350,7 @@ void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 		*/
 		again:
 			if((time_out = sleep(time_out)) > 0){
-				printf("Received an interrupt - remaining time :%u\n",time_out);
+				//printf("Received an interrupt - remaining time :%u\n",time_out);
 				goto again;
 			}
 		char vm_name[20];
@@ -406,6 +409,15 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 	}
 
 	destAddr.sin_port = 0;
+
+
+	char next_vm_name[20];
+
+	memset(next_vm_name,'\0',20);
+
+	strcpy(next_vm_name,Gethostbyaddr(getIpAddressInTourList(payload.tour_list,payload.index)));
+
+	printf("%s is sending the source routing packet to next node in the tour %s\n",Gethostname(),next_vm_name);
 
 	if(sendto(sockfd,buff,BUFFER_SIZE,0,(SA *)&destAddr,sizeof(struct sockaddr)) < 0){
 		printf("Error in Sendto in %s\n",strerror(errno));
@@ -477,29 +489,29 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	unix_sockfd = socket(AF_LOCAL,SOCK_STREAM,0);
 
 	char target_ip_address[128];
-
-	char file_name[15] = "/tmp/npaXXXXXX";
-	file_name[14] = '\0';
+//
+//	char file_name[15] = "/tmp/npaXXXXXX";
+//	file_name[14] = '\0';
 
 	arp_addr.sun_family = AF_LOCAL;
 	temp_tour_addr.sun_family = AF_LOCAL;
 
-	if(mkstemp(file_name) < 0){
-		printf("error in creating temporary file\n");
-		exit(-1);
-	}
-
-	if(DEBUG){
-		printf("temp-file_name :%s\n",file_name);
-	}
-
-	unlink(file_name);
-
-	strcpy(temp_tour_addr.sun_path, file_name);
+//	if(mkstemp(file_name) < 0){
+//		printf("error in creating temporary file\n");
+//		exit(-1);
+//	}
+//
+//	if(DEBUG){
+//		printf("temp-file_name :%s\n",file_name);
+//	}
+//
+//	unlink(file_name);
+//
+//	strcpy(temp_tour_addr.sun_path, file_name);
 
 	strcpy(arp_addr.sun_path,ARP_WELL_KNOWN_PATH_NAME);
 
-	Bind(unix_sockfd,(SA *)&temp_tour_addr,sizeof(temp_tour_addr));
+	//Bind(unix_sockfd,(SA *)&temp_tour_addr,sizeof(temp_tour_addr));
 
 	connect(unix_sockfd,(SA *)&arp_addr,sizeof(arp_addr));
 
@@ -513,15 +525,37 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 	uds_msg.hw_addr = *HWaddr;
 
-	if(sendto(unix_sockfd,&uds_msg,sizeof(uds_msg),0,NULL,0) < 0){
+	int n=0;
+
+	if((n=sendto(unix_sockfd,&uds_msg,sizeof(uds_msg),0,NULL,0)) < 0){
 
 		printf("Error in send to in areq %s\n",strerror(errno));
 	}
+
+	//printf("Sending an packet arp with bytes :%d\n",n);
 
 	memset(&uds_msg, '\0',sizeof(uds_msg));
 
 	if(DEBUG)
 		printf("Send waiting in recv\n");
+
+
+	struct timeval t;
+
+	t.tv_sec = 2;
+	t.tv_usec = 0;
+
+	fd_set monitor_fds;
+
+	FD_ZERO(&monitor_fds);
+	FD_SET(unix_sockfd,&monitor_fds);
+
+	if(Select(unix_sockfd+1,NULL,NULL,NULL,&t) < 0){
+
+		return -1;
+	}
+
+
 
 	if(recvfrom(unix_sockfd,&uds_msg,sizeof(uds_msg),0,NULL,NULL)< 0){
 
@@ -540,7 +574,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 	printHWADDR(HWaddr->sll_addr);
 
-	unlink(file_name);
+	//unlink(file_name);
 
 	return 0;
 }
@@ -562,7 +596,10 @@ void get_predecessor_mac(char *ip_addr, struct hwaddr *hw_addr){
 	hw_addr->sll_ifindex = ETH0_INDEX;
 	hw_addr->sll_hatype = ETH_HA_TYPE;
 
-	areq((SA *)&pred_addr,sizeof(struct sockaddr_in), hw_addr);
+	if(areq((SA *)&pred_addr,sizeof(struct sockaddr_in), hw_addr) < 0){
+
+		printf("Timeout:ARP failed to get the failed mac-address for ip-address :%s\n",ip_addr);
+	}
 }
 
 

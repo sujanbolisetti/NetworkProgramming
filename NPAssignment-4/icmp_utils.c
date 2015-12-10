@@ -39,13 +39,16 @@ bool is_prev_node_in_list(char* ip_addr)
 	while(temp!=NULL)
 	{
 		if(!strcmp(temp->ip_address, ip_addr)){
-			printf("Predecessor is already present in the list %s\n",Gethostbyaddr(ip_addr));
+
+			if(DEBUG)
+				printf("Predecessor is already present in the list %s\n",Gethostbyaddr(ip_addr));
+
 			return true;
 		}
 		temp = temp->next;
 	}
 
-	printf("prev node doesn't exist in the list\n");
+	//printf("prev node doesn't exist in the list\n");
 	return false;
 }
 
