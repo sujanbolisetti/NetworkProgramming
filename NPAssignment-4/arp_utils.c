@@ -7,7 +7,7 @@
 
 #include "src_usp.h"
 
-struct ip_addr_hw_addr_pr *my_hw_addr_head = NULL;
+//struct ip_addr_hw_addr_pr *my_hw_addr_head = NULL;
 unsigned char BROADCAST_MAC_ADDRESS[6]=  {0xff,0xff,0xff,0xff,0xff,0xff};
 
 struct arp_cache_entry *arp_cache_head = NULL;
@@ -17,11 +17,14 @@ struct sockaddr *sa;
 
 void create_ip_hw_mp(struct hwa_info *head){
 
+	my_hw_addr_head = NULL;
+
 	struct hwa_info *temp = head;
 
 	struct ip_addr_hw_addr_pr *temp_my_hw_addr = NULL;
 
-	printf("Entered creating the ip_addr_hw_addr map\n");
+	if(DEBUG)
+		printf("Entered creating the ip_addr_hw_addr map\n");
 
 	while(temp!=NULL){
 
@@ -29,13 +32,17 @@ void create_ip_hw_mp(struct hwa_info *head){
 
 		memcpy(node->mac_addr,temp->if_haddr,ETH_ALEN);
 
-		printf("Populated the mac_addr\n");
+		ETH0_INDEX =  temp->if_index;
+
+		if(DEBUG)
+			printf("Populated the mac_addr and ifi_index is :%d\n",temp->if_index);
 
 		if ((sa = temp->ip_addr) != NULL){
 			strcpy(node->ip_addr,Sock_ntop_host(sa, sizeof(struct sockaddr)));
 		}
 
-		printf("printing the ip_address %s\n",node->ip_addr);
+		if(DEBUG)
+			printf("printing the ip_address %s\n",node->ip_addr);
 
 		node -> next = NULL;
 
@@ -56,7 +63,9 @@ void print_my_hw_ip_mp(){
 
 	while(temp_my_hw_addr != NULL){
 
-		 printf("         IP addr = %s\n", temp_my_hw_addr->ip_addr);
+		 if(DEBUG)
+			 printf("         IP addr = %s\n", temp_my_hw_addr->ip_addr);
+
 		 printHWADDR(temp_my_hw_addr->mac_addr);
 		 temp_my_hw_addr = temp_my_hw_addr->next;
 	}
@@ -64,7 +73,7 @@ void print_my_hw_ip_mp(){
 
 void printHWADDR(char *hw_addr){
 
-	printf("         HW addr = ");
+	printf(" MAC addr = ");
 	char *ptr = hw_addr;
 	int i = IF_HADDR;
 	do {
@@ -82,13 +91,17 @@ sock_ntop_host(const struct sockaddr *sa, socklen_t salen)
 
 	switch (sa->sa_family) {
 		case AF_INET: {
-			printf("Entered into AF_INET\n");
+			if(DEBUG)
+				printf("Entered into AF_INET\n");
+
 			struct sockaddr_in	*sin = (struct sockaddr_in *) sa;
 
 			if (inet_ntop(AF_INET, &sin->sin_addr, str, sizeof(str)) == NULL)
 				return(NULL);
 
-			printf("IP_address %s\n",str);
+			if(DEBUG)
+				printf("IP_address %s\n",str);
+
 			return(str);
 		}
 	}
@@ -108,12 +121,13 @@ Sock_ntop_host(const struct sockaddr *sa, socklen_t salen)
 struct arp_pkt* build_arp_pkt(int pkt_type, unsigned char *snd_hw_addr,
 												char *snd_ip_addr, char *tgt_ip_address){
 
-	printf("Building ARP _PACKET at node %s\n",Gethostname());
+	if(DEBUG)
+		printf("Building ARP _PACKET at node %s\n",Gethostname());
 
 	struct arp_pkt *pkt = (struct arp_pkt *)malloc(sizeof(struct arp_pkt));
 
 	pkt->hard_type =  1;
-	pkt->prot_type = 0x800;
+	pkt->prot_type = htons(ARP_GRP_TYPE);
 	pkt->hard_size = 6;
 	pkt->prot_size = 4;
 	pkt->op = pkt_type;
@@ -129,8 +143,8 @@ void build_eth_frame(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
 			struct sockaddr_ll *addr_ll, struct arp_pkt *pkt, int eth_pkt_type){
 
-
-	printf("Building ETHR FRAME at node %s\n",Gethostname());
+	if(DEBUG)
+		printf("Building ETHR FRAME at node %s\n",Gethostname());
 
 	bzero(addr_ll,sizeof(*addr_ll));
 
@@ -171,10 +185,11 @@ void build_eth_frame(void *buffer,char *dest_mac,
 
 void build_eth_frame_ip(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
-			struct sockaddr_ll *addr_ll, struct ip *pkt, int eth_pkt_type){
+			struct sockaddr_ll *addr_ll, char *pkt, int eth_pkt_type){
 
 
-	printf("Building ETHR FRAME at node %s\n",Gethostname());
+	if(DEBUG)
+		printf("Building ETHR FRAME for ip at node %s\n",Gethostname());
 
 	bzero(addr_ll,sizeof(*addr_ll));
 
@@ -187,20 +202,22 @@ void build_eth_frame_ip(void *buffer,char *dest_mac,
 	addr_ll->sll_family   = AF_PACKET;
 	addr_ll->sll_ifindex  = inf_index;
 	addr_ll->sll_pkttype  = eth_pkt_type;
-	addr_ll->sll_protocol = ETH_P_IP;
+	addr_ll->sll_protocol = htons(ETH_P_IP);
 	addr_ll->sll_halen    = ETH_ALEN;
 
 	memcpy((void*)buffer, (void*)dest_mac, ETH_ALEN);
 	memcpy((void*)(buffer+ETH_ALEN), (void*)src_mac, ETH_ALEN);
-	eh->h_proto = htons(ARP_GRP_TYPE);
+	eh->h_proto = htons(ETH_P_IP);
 
 	memcpy(addr_ll->sll_addr,(void*)dest_mac, ETH_ALEN);
 
-	printf("Destination and src mac address\n");
+	if(DEBUG){
+		printf("Destination and src mac address\n");
 
-	printHWADDR(dest_mac);
+		printHWADDR(dest_mac);
 
-	printHWADDR(src_mac);
+		printHWADDR(src_mac);
+	}
 
 	/**
 	 *  blanking out the last two values.
@@ -208,19 +225,24 @@ void build_eth_frame_ip(void *buffer,char *dest_mac,
 	addr_ll->sll_addr[6] = 0x00;
 	addr_ll->sll_addr[7] = 0x00;
 
-	memcpy(data,pkt,sizeof(struct ip));
+	if(DEBUG)
+		printf("Size of the data in icmp %ld\n",sizeof(*pkt));
+
+	memcpy(data,pkt,(IP_HDR_LEN + 8));
 }
 
 void process_arp_req(int pf_sockfd,struct arp_pkt *pkt,int recv_if_index){
 
 	struct arp_cache_entry *arp_entry = NULL;
 
-	printf("Processing the received arp_req at node %s\n",Gethostname());
+	if(DEBUG)
+		printf("Processing the received arp_req at node %s\n",Gethostname());
 
 	// check if this arp_req is for me. if so send a arp_reply.
 	if(arp_req_is_for_me(pkt->target_ip_address)){
 
-		printf("ARP_REQ belongs to me at node %s\n",Gethostname());
+		if(DEBUG)
+			printf("ARP_REQ belongs to me at node %s\n",Gethostname());
 
 		update_arp_cache(pkt->snd_ethr_addr,pkt->snd_ip_address,recv_if_index,INVALID_SOCK_DESC);
 		send_arp_reply(pf_sockfd,pkt);
@@ -234,6 +256,11 @@ void process_arp_rep(struct arp_pkt *pkt){
 	struct uds_arp_msg uds_msg;
 
 	if((temp = get_hw_addr_arp_cache(pkt->snd_ip_address)) != NULL){
+
+		if(DEBUG){
+			printf("Mac address from Packet\n");
+			printHWADDR(pkt->snd_ethr_addr);
+		}
 
 		memcpy(temp->hw_address,pkt->snd_ethr_addr,ETH_ALEN);
 
@@ -254,6 +281,8 @@ void process_arp_rep(struct arp_pkt *pkt){
 
 			temp->cli_sockdes = INVALID_SOCK_DESC;
 			close(temp->cli_sockdes);
+
+			print_arp_cache();
 		}else{
 
 			printf("Socket Descriptor is less than zero in the sender.......**********");
@@ -317,7 +346,7 @@ void update_arp_cache(unsigned char *eth_addr,char *ip_address,int recv_if_index
 
 	struct arp_cache_entry *cache_entry = (struct arp_cache_entry *)malloc(sizeof(struct arp_cache_entry));
 
-	printf("Updating the ARP_CACHE at node %s\n",Gethostname());
+	printf("%s is updating its ARP_CACHE\n",Gethostname());
 
 	if(eth_addr != NULL){
 		memcpy(cache_entry->hw_address,eth_addr,ETH_ALEN);
@@ -368,6 +397,9 @@ struct arp_cache_entry* get_hw_addr_arp_cache(char *ip_address){
 	while(temp!=NULL){
 
 		if(!strcmp(temp->ip_address,ip_address)){
+			if(DEBUG)
+				printf("IpAddress is in arp cache\n");
+
 			return temp;
 		}
 		temp= temp->next;
@@ -402,9 +434,25 @@ void Sendto(int pf_sockfd, char* buffer, struct sockaddr_ll addr_ll,char *sendTy
 {
 	if(sendto(pf_sockfd,buffer,ETHR_FRAME_SIZE,0,
 					(SA *)&addr_ll,sizeof(addr_ll)) < 0){
-		printf("ODR at node %s : In sending %s received an error %s\n",Gethostname(),sendType, strerror(errno));
+		printf("%s error in sending packet type %s due to %s\n",Gethostname(),sendType, strerror(errno));
 		exit(-1);
 	}
 
-	printf("Sent a pkt type %s\n",sendType);
+	if(DEBUG)
+		printf("Sent a pkt type %s\n",sendType);
+}
+
+void print_arp_cache(){
+
+	struct arp_cache_entry *temp = arp_cache_head;
+
+	while(temp != NULL){
+
+		printf("IP Address :%s ",temp->ip_address);
+
+		printf("Mac Address ");
+		printHWADDR(temp->hw_address);
+		temp = temp->next;
+	}
+
 }

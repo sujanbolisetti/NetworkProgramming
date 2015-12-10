@@ -10,9 +10,11 @@
 
 #define GRP_PROTOCOL_VALUE 182
 
-#define DEBUG 1
+#define DEBUG 0
 
-#define MULTICAST_ADDRESS "224.0.0.224"
+#define TIME_OUT_FOR_MULTICAST 10
+
+#define MULTICAST_ADDRESS "225.0.1.224"
 
 #define MULTICAST_PORT_NUMBER 32765
 
@@ -42,7 +44,7 @@
 
 #define ETHR_FRAME_SIZE sizeof(struct arp_pkt) + 14
 
-#define ETHR_FRAME_SIZE_IP sizeof(struct ip) + 14
+#define ETHR_FRAME_SIZE_IP sizeof(struct ip) + 14 + ICMP_HDR_LEN + ICMP_DATA_LEN
 
 #define ARP_REQ 1
 
@@ -54,7 +56,9 @@
 
 #define INVALID_SOCK_DESC -1
 
-#define ETH0_INDEX 2
+#define ICMP_HDR_LEN 8
+
+#define ICMP_DATA_LEN 100
 
 #define ICMP_IDENTIFIER 7212
 

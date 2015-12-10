@@ -254,7 +254,6 @@ void doFileTransfer(struct binded_sock_info *sock_info,struct sockaddr_in IPClie
 
 	Bind(conn_sockfd,(SA *)&serverAddr,sizeof(serverAddr));
 
-
 	Getsockname(conn_sockfd,(SA *)&serverAddr,&length);
 
 	printf("(%s) Server Child is running on IP-Address : %s with port number : %d\n",client_addr,sock_info->ip_address,ntohs(serverAddr.sin_port));

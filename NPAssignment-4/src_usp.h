@@ -66,6 +66,8 @@
 #define	min(a,b)	((a) < (b) ? (a) : (b))
 #define	max(a,b)	((a) > (b) ? (a) : (b))
 
+struct ip_addr_hw_addr_pr *my_hw_addr_head;
+
 struct tour_route{
 	char ip_address[32];
 	uint16_t port_number;
@@ -127,10 +129,12 @@ struct uds_arp_msg{
 
 struct icmp_tour_node {
 	char ip_address[128];
+	int seqNum;
 	struct icmp_tour_node *next;
 };
 
 int pf_sockfd;
+int ETH0_INDEX;
 
 void convertToNetworkOrder(struct arp_pkt *pkt);
 
@@ -171,7 +175,7 @@ void allocate_buffer(char **buff);
 
 void process_received_datagram(int sockfd, int udp_sockfd, char *buff);
 
-void send_multicast_msg(int udp_sockfd);
+void send_multicast_msg(int udp_sockfd,char *msg);
 
 void build_multicast_addr(struct sockaddr_in *multi_addr);
 
@@ -210,11 +214,28 @@ void sig_alrm_handler(int signum);
 
 // ICMP related
 void add_prev_node(char *ip_addr);
+
 bool is_prev_node_in_list(char* ip_addr);
+
 void send_icmp_echoes();
 
 void build_eth_frame_ip(void *buffer,char *dest_mac,
 			char *src_mac,int inf_index,
-			struct sockaddr_ll *addr_ll, struct ip *pkt, int eth_pkt_type);
+			struct sockaddr_ll *addr_ll, char *pkt, int eth_pkt_type);
+
+uint16_t
+checksum (uint16_t *addr, int len);
+
+char*
+Gethostbyaddr(char* canonical_ip_address);
+
+void send_icmp_echo(int sockfd, char *dest_addr_ip,struct hwaddr hw_addr,int seqNum);
+
+uint16_t
+in_cksum(uint16_t *addr, int len);
+
+void print_arp_cache();
+
+void sig_alrm_handler_termination(int signum);
 
 #endif /* SRC_USP_H_ */

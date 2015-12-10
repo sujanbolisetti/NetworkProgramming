@@ -15,7 +15,7 @@ int main(){
 
 	struct uds_arp_msg uds_msg;
 
-	struct arp_cache_entry *arp_entry = (struct arp_cache_entry *)malloc(sizeof(struct arp_cache_entry));
+	struct arp_cache_entry *arp_entry = NULL;
 
 	struct sockaddr_ll addr_ll;
 
@@ -63,12 +63,21 @@ int main(){
 
 			printf("Received a packet from Unix Domain Socket\n");
 
+			memset(recvbuff,0,BUFFER_SIZE);
+
+			printf("Before Recv_from  \n");
+
 			if(recvfrom(cli_uds_connfd,recvbuff,BUFFER_SIZE,0,NULL,NULL) < 0 ){
 				printf("Error in Recv from %s\n",strerror(errno));
 			}
 
+			printf("After Recv_from -1 \n");
 			bzero(&uds_msg,sizeof(uds_msg));
-			bzero(arp_entry,sizeof(arp_entry));
+			printf("After Recv_from -2 \n");
+
+
+
+			printf("After Recv_from -3 \n");
 
 			memcpy(&uds_msg,recvbuff,strlen(recvbuff));
 
@@ -87,6 +96,8 @@ int main(){
 				if(sendto(cli_uds_connfd,&uds_msg,sizeof(uds_msg),0,NULL,0) < 0){
 					printf("Error in Sendto in arp module %s\n",strerror(errno));
 				}
+
+				print_arp_cache();
 
 			}else{
 

@@ -9,6 +9,7 @@
 
 char *my_name;
 bool isHostNameFilled = false;
+bool joinedMulticastGrp =false;
 
 void allocate_buffer(char **buff){
 
@@ -101,8 +102,6 @@ Gethostbyname(char *my_name){
 		 *  first address as that is the canonical IpAddress
 		 *  we are considering.
 		 */
-
-		//strcpy(ip_addr,inet_ntoa(*ipaddr_list[0]));
 		return inet_ntoa(*ipaddr_list[0]);
 	}else{
 		printf("gethostbyname error: %s for hostname: %s\n",hstrerror(h_errno),my_name);
@@ -121,29 +120,69 @@ char* Gethostname(){
 	return my_name;
 }
 
-void send_icmp_echo(int sockfd, char *buff, char *dest_addr_ip, char *dest_mac) {
-	char *data = buff + IP_HDR_LEN;
-	struct icmp *icmp = (struct icmp *)data;
-	struct sockaddr_ll addr_ll;
-	extern struct ip_addr_hw_addr_pr* my_hw_addr_head;
+void send_icmp_echo(int sockfd, char *dest_addr_ip,struct hwaddr hw_addr,int seqNum) {
 
-	icmp->icmp_type = ICMP_ECHOREPLY;
+	char *buff = malloc(IP_HDR_LEN + ICMP_HDR_LEN + ICMP_DATA_LEN);
+
+	build_ip_header(buff, IP_HDR_LEN+8, dest_addr_ip, true);
+
+	char *icmp_hdr = buff + IP_HDR_LEN;
+
+	struct icmp *icmp = (struct icmp *)icmp_hdr;
+	struct sockaddr_ll addr_ll;
+
+	char data_icmp[ICMP_DATA_LEN];
+	/**
+	 * Setting dummy data for sending the ping
+	 */
+	memset(data_icmp,'q',ICMP_DATA_LEN);
+
+	bzero(&addr_ll,sizeof(addr_ll));
+
+	icmp->icmp_seq = seqNum;
+	icmp->icmp_type = ICMP_ECHO;
 	icmp->icmp_code = 0;
 	icmp->icmp_cksum = 0;
-	icmp->icmp_id = ICMP_IDENTIFIER;
+	icmp->icmp_id = htons(ICMP_IDENTIFIER);
+	icmp->icmp_cksum = in_cksum((u_short *)icmp,ICMP_HDR_LEN + ICMP_DATA_LEN);
 
-	build_ip_header(buff, IP_HDR_LEN + 8, dest_addr_ip, false);
+	if(DEBUG)
+		printf("Sending ICMP Echo message to %s\n",dest_addr_ip);
 
 	char *eth_buff = (char *)malloc(ETHR_FRAME_SIZE_IP * sizeof(char));
-	build_eth_frame_ip(eth_buff, dest_mac, my_hw_addr_head->mac_addr, ETH0_INDEX, &addr_ll, (struct ip*)buff, PACKET_OTHERHOST);
 
-	Sendto(sockfd, buff, addr_ll,"ICMP_ECHO");
+	if(DEBUG){
+		printf("Printing src  ");
+		printHWADDR(my_hw_addr_head->mac_addr);
+		printf("Printing dest  ");
+		printHWADDR(hw_addr.sll_addr);
+		printf("Length of the ethr frame %lu",sizeof(struct icmp));
+	}
+
+	char* predecessor_vm_name = malloc(10);
+
+	strcpy(predecessor_vm_name,Gethostbyaddr(dest_addr_ip));
+
+
+	/**
+	 * Ping information
+	 */
+	printf("PING %s (%s): %d data bytes \n",
+					predecessor_vm_name,dest_addr_ip,ICMP_DATA_LEN);
+
+	build_eth_frame_ip(eth_buff, hw_addr.sll_addr, my_hw_addr_head->mac_addr, ETH0_INDEX, &addr_ll, buff, PACKET_OTHERHOST);
+
+	if(sendto(pf_sockfd,eth_buff,ETHR_FRAME_SIZE_IP,0,
+						(SA *)&addr_ll,sizeof(addr_ll)) < 0){
+			printf("Error at sendto at ICMP :%s\n", strerror(errno));
+			exit(-1);
+	}
 }
 
 void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp){
 
 	if(DEBUG){
-		printf("Building the IP_Address\n");
+		printf("Building the IP header\n");
 	}
 
 	struct ip *ip = (struct ip *)buff;
@@ -160,13 +199,14 @@ void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp
 
 	ip->ip_off =  0;
 
-	ip->ip_ttl = MAX_TTL_VALUE;
-
-	if(isIcmp)
+	if(isIcmp){
+		ip->ip_ttl = 1;
 		ip->ip_p = IPPROTO_ICMP;
-	else
+	}
+	else{
+		ip->ip_ttl = MAX_TTL_VALUE;
 		ip->ip_p = GRP_PROTOCOL_VALUE;
-
+	}
 
 	if(inet_pton(AF_INET,dest_addr,&ip->ip_dst) < 0){
 		printf("Error in converting numeric format %s\n",strerror(errno));
@@ -175,6 +215,11 @@ void build_ip_header(char *buff, uint16_t total_len,char *dest_addr, bool isIcmp
 	if(inet_pton(AF_INET,Gethostbyname(Gethostname()),&ip->ip_src) < 0){
 		printf("Error in converting numeric format %s\n",strerror(errno));
 	}
+
+	ip->ip_sum = 0;
+
+	ip->ip_sum = in_cksum((u_short *)ip,(IP_HDR_LEN+8));//htons(0x7d9e);//in_cksum((u_short *)ip,IP_HDR_LEN);
+
 }
 
 void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct tour_route *tour_list){
@@ -193,7 +238,8 @@ void populate_data_in_datagram(char *buff, uint16_t index,uint16_t count, struct
 
 	memcpy(payload.tour_list,tour_list,(sizeof(struct tour_route)*SIZE_OF_TOUR_LIST));
 
-	print_the_payload(payload);
+	if(DEBUG)
+		print_the_payload(payload);
 
 	// TODO
 	//convertToNetworkOrder(&payload);
@@ -228,16 +274,34 @@ getIpAddressInTourList(struct tour_route *tour_list, uint16_t index){
 uint16_t
 calculate_length(){
 
-	printf("Length %ld\n",IP_HDR_LEN + sizeof(struct tour_payload));
+	if(DEBUG)
+		printf("Length %ld\n",IP_HDR_LEN + sizeof(struct tour_payload));
 
 	return IP_HDR_LEN + sizeof(struct tour_payload);
 }
 
 void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 
-	printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
+	if(DEBUG)
+		printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
+
+	char time_buff[100];
+
+	memset(time_buff,0,sizeof(time_buff));
+
+	time_t ticks = time(NULL);
+
+	snprintf(time_buff, sizeof(time_buff), "%.24s\r\n" , ctime(&ticks));
 
 	struct ip *ip_hdr = (struct ip *)buff;
+
+	char src_addr[32];
+
+	inet_ntop(AF_INET,&ip_hdr->ip_src,src_addr,32);
+
+	printf("%s received source routing packet from %s\n",time_buff,Gethostbyaddr(src_addr));
+
+	add_prev_node(src_addr);
 
 	char *data = buff + IP_HDR_LEN;
 
@@ -245,12 +309,62 @@ void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 
 	memcpy(&payload,data,sizeof(payload));
 
-	print_the_payload(payload);
+	if(DEBUG)
+		print_the_payload(payload);
 
 	if(payload.index == payload.count-SOURCE_AND_MULTICAST_COUNT){
-		printf("I am last node in the tour\n");
-		printf("Sending the multi-cast message as I am last node in the tour\n");
-		send_multicast_msg(udp_sockfd);
+
+		if(DEBUG){
+			printf("I am last node in the tour\n");
+			printf("Sending the multi-cast message as I am last node in the tour\n");
+		}
+
+		unsigned int time_out = TIME_OUT_FOR_MULTICAST;
+		/**
+		 *  Setting the five secs wait
+
+		struct timeval t;
+
+		t.tv_sec = TIME_OUT_FOR_MULTICAST;
+		t.tv_usec = 0;
+
+		int sockfd = socket(AF_INET,SOCK_STREAM,0);
+
+		fd_set monitor_fds;
+
+		FD_ZERO(&monitor_fds);
+		FD_SET(sockfd,&monitor_fds);
+
+		again:
+			if(select(sockfd + 1, &monitor_fds, NULL, NULL, &t) <  0){
+				if(errno == EINTR){
+					printf("Received the EINTR and remaining time %ld\n",t.tv_sec);
+					goto again;
+				}else{
+					printf("Received an error in select :%s\n",strerror(errno));
+				}
+			}
+		*/
+		again:
+			if((time_out = sleep(time_out)) > 0){
+				printf("Received an interrupt - remaining time :%u\n",time_out);
+				goto again;
+			}
+		char vm_name[20];
+
+		strcpy(vm_name,Gethostname());
+
+		char msg[200];
+
+		memset(msg,'\0',200);
+
+		strcat(msg,"This is node ");
+
+		strcat(msg,vm_name);
+
+		strcat(msg,".Tour has ended.Group members please identify yourselves.");
+
+		send_multicast_msg(udp_sockfd,msg);
 	}else{
 		forward_the_datagram(sockfd, payload);
 	}
@@ -260,7 +374,6 @@ void
 print_the_payload(struct tour_payload payload){
 
 	int i=0;
-
 	printf("Index : %d and Size of list : %d  in received payload\n",payload.index,payload.count);
 
 	printf("printing the received tour\n");
@@ -277,8 +390,6 @@ void
 forward_the_datagram(int sockfd, struct tour_payload payload){
 
 	char *buff = (char *)malloc(BUFFER_SIZE*sizeof(char));
-
-	//allocate_buffer(&buff);
 
 	payload.index++;
 
@@ -303,26 +414,33 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 
 void join_mcast_grp(int udpsendsockfd){
 
-	struct sockaddr_in multi_addr;
+	if(!joinedMulticastGrp){
+		struct sockaddr_in multi_addr;
 
-	build_multicast_addr(&multi_addr);
+		build_multicast_addr(&multi_addr);
 
-	Mcast_join(udpsendsockfd,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
+		Mcast_join(udpsendsockfd,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
+
+		joinedMulticastGrp = true;
+	}
 }
 
-void send_multicast_msg(int udp_sockfd)
+void send_multicast_msg(int udp_sockfd,char *msg)
 {
-	char msg[128] = "Hello Guys, We are part of one group\n";
 
 	struct sockaddr_in destAddr;
 
 	build_multicast_addr(&destAddr);
 
+	printf("Node %s Sending: %s\n",Gethostname(),msg);
+
 	if(sendto(udp_sockfd, msg, strlen(msg), 0,(SA *)&destAddr, sizeof(struct sockaddr_in)) < 0)
 	{
 		printf("Error in sending message to multi-cast address %s\n", strerror(errno));
 	}
-	printf("Sent multicast message\n");
+
+	if(DEBUG)
+		printf("Sent multicast message\n");
 }
 
 void build_multicast_addr(struct sockaddr_in *multi_addr){
@@ -346,7 +464,9 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 	// connect to the arp process on the well known arp is running.
 	// wait for a reply with a time out set.
 
-	printf("Came into areq\n");
+	if(DEBUG)
+		printf("Came into areq\n");
+
 	int unix_sockfd;
 
 	struct sockaddr_un arp_addr;
@@ -373,9 +493,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 		printf("temp-file_name :%s\n",file_name);
 	}
 
-	if(unlink(file_name) < 0){
-		printf("str error %s\n",strerror(errno));
-	}
+	unlink(file_name);
 
 	strcpy(temp_tour_addr.sun_path, file_name);
 
@@ -389,7 +507,7 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 	inet_ntop(AF_INET,&target_addr->sin_addr,target_ip_address,sizeof(target_ip_address));
 
-	printf("target ip address :%s\n",target_ip_address);
+	printf("Calling ARP module for getting the mac-address for ip address :%s\n",target_ip_address);
 
 	strcpy(uds_msg.target_ip_address,target_ip_address);
 
@@ -402,16 +520,27 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 	memset(&uds_msg, '\0',sizeof(uds_msg));
 
-	printf("Send waiting in recv\n");
+	if(DEBUG)
+		printf("Send waiting in recv\n");
 
 	if(recvfrom(unix_sockfd,&uds_msg,sizeof(uds_msg),0,NULL,NULL)< 0){
 
 		printf("Error in recv from %s\n",strerror(errno));
 	}
 
-	printf("Message received for areq  ");
+	if(DEBUG){
+		printf("Message received for areq  ");
 
-	printHWADDR(uds_msg.hw_addr.sll_addr);
+		printHWADDR(uds_msg.hw_addr.sll_addr);
+	}
+
+	*HWaddr = uds_msg.hw_addr ;
+
+	printf("Received the mac-address from the ARP module for ip address %s and the",target_ip_address);
+
+	printHWADDR(HWaddr->sll_addr);
+
+	unlink(file_name);
 
 	return 0;
 }
@@ -420,7 +549,8 @@ int areq (struct sockaddr *IPaddr, socklen_t sockaddrlen, struct hwaddr *HWaddr)
 
 void get_predecessor_mac(char *ip_addr, struct hwaddr *hw_addr){
 
-	printf("came into pinging the packet\n");
+	if(DEBUG)
+		printf("came into pinging the packet\n");
 
 	struct sockaddr_in pred_addr;
 
@@ -436,3 +566,60 @@ void get_predecessor_mac(char *ip_addr, struct hwaddr *hw_addr){
 }
 
 
+char*
+Gethostbyaddr(char* canonical_ip_address){
+
+	struct hostent *he;
+	struct in_addr ipAddr;
+	//char* vm_name = (char *)malloc(20);
+
+	if((inet_pton(AF_INET,canonical_ip_address,&ipAddr)) <  0){
+				printf("%s\n",strerror(errno));
+	}
+
+	if((he = gethostbyaddr(&ipAddr, sizeof(ipAddr), AF_INET))!= NULL){
+		if(DEBUG)
+			printf("host name: %s\n", he->h_name);
+
+		return he->h_name;
+	}else{
+		printf("gethostbyaddr error : %s for ipadress: %s\n",hstrerror(h_errno),canonical_ip_address);
+		exit(-1);
+	}
+	return NULL;
+}
+
+
+/**
+ *  Borrowed this method from the steven code.
+ */
+uint16_t
+in_cksum(uint16_t *addr, int len)
+{
+	int				nleft = len;
+	uint32_t		sum = 0;
+	uint16_t		*w = addr;
+	uint16_t		answer = 0;
+
+	/*
+	 * Our algorithm is simple, using a 32 bit accumulator (sum), we add
+	 * sequential 16 bit words to it, and at the end, fold back all the
+	 * carry bits from the top 16 bits into the lower 16 bits.
+	 */
+	while (nleft > 1)  {
+		sum += *w++;
+		nleft -= 2;
+	}
+
+		/* 4mop up an odd byte, if necessary */
+	if (nleft == 1) {
+		*(unsigned char *)(&answer) = *(unsigned char *)w ;
+		sum += answer;
+	}
+
+		/* 4add back carry outs from top 16 bits to low 16 bits */
+	sum = (sum >> 16) + (sum & 0xffff);	/* add hi 16 to low 16 */
+	sum += (sum >> 16);			/* add carry */
+	answer = ~sum;				/* truncate to 16 bits */
+	return(answer);
+}

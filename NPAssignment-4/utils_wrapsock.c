@@ -23,8 +23,17 @@ Select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
 {
 	int		n;
 
-	if ( (n = select(nfds, readfds, writefds, exceptfds, timeout)) < 0)
-		printf("select error %s\n",strerror(errno));
+	again:
+		if ( (n = select(nfds, readfds, writefds, exceptfds, timeout)) < 0){
+
+			if(errno == EINTR){
+				printf("Received an interrupt\n");
+				goto again;
+			}else{
+				printf("select error %s\n",strerror(errno));
+			}
+		}
+
 	return(n);		/* can return 0 on timeout */
 }
 
