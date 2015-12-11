@@ -30,13 +30,76 @@ Starting tour application:
 	You can start the tour application by running this command './src_tour_sbolisetti_sthota'. The tour application at the source node should be started by list of the node names in the tour as arguments. 
 		Eg: ./src_tour_sbolisetti_sthota vm2 vm3 ==> So here the tour nodes are vm2 and vm3.
 
+
+Tour Application:
+
+1. The tour application creates five sockets. Two RAW Sockets one for routing (rt) and the other for pinging (pg). One PF_PACKET socket for sending the pings to the preceding node and two UDP sockets one for sending the multicast message and another for receiving the multicast messages.
+2. The application which receives the commandline arguments as list of vm nodes is the source node in the tour.
+3. The source node creates the list of vm node address from the vm names (using gethostbyname) entered in the command line arguments and this 
+will be sent as a data in the ip packet and the node also adds its address and multicast address to join in the tour list created.
+4. Th source node also adds the current index position of the node in the tour. So the next node identifies who is the next node to which it has to forward the packet and it also joins the mutli-cast group.
+5.Every nodes which receives the source route packet will increment the index in the tour and send the packet to the next node.
+6. The nodes which receives the packet also starts to ping its predecessor in the tour for every one sec interval used sig alarm for achieving this.
+7. Every node receiving the source route packet also joins the multicast group.
+8. The last node in the tour will wait for five seconds before sending a end of tour mutlicast message. The node waits by sleeping for five seconds and handled SIGALRM.
+9. All the nodes in the tour receives the end of tour message and stops pinging.
+10.All the nodes in the tour announces that they are the member of the multicast group to all other nodes.
+11. Every node waits for five to receive these multicast message and exits the tour irrespective whether it receives or not these meesages.
+12. Used unique identification field to identify our group packets.
+
+				RAW Socket Packet
+	----------------------------------------------------------------
+	|			IP_HDR					|
+	|								|
+	|---------------------------------------------------------------
+	|								|																		
+	|		   Data -- Tour List of nodes			|
+	----------------------------------------------------------------
+
+ARP application:
+----------------
+
 Starting Arp Module:
 --------------------
 	You can start the arp module by running the command './src_arp_sbolisetti_sthota'
 
-Tour Application:
+1. Similar to ARP module our arp application also will perform the same task of getting the mac address given an IP Address on LAN.
+2. We will send the ARP request to all the nodes in the LAN by setting the destination address as the broadcast address.
+3. The node whose ip_address is in the request will send a ARP_REPLY by putting its Mac address in the reply packet.
+4. All the remaining nodes will ignore the arp_req sent. 
+5. The arp_req destined node will enter senders mac and ip address in the arp cache.
+6. ARP_REQ is a broadcast ethernet message but reply is a unicast frame.
+7. We have standard ethernet packet types: ARP_REQ -> 1 and ARP_REP -> 2.
+8. Every node uses the arp module to get the ip address of the preceding node so that it can send ping packet.
+9. The tour application used unix domain stream socket to communicate with the ARP module underneath.
 
-1. The tour application creates five sockets.
+
+Interaction between tour application and Arp application.
+
+Scenario : Tour Node-1 needs mac address of tour node-2.
+
+
+     Tour Node-1                                	      Tour Node-2 
+          |                                           		  |
+          |                                        		  |
+   Unix domain socket                          		    Unix domain socket
+          |    ---- Remaining nodes will discard the REQ--------- |
+          |                                           		  |
+         ARP_REQ----------> ARP_REQ ... ARP_REQ --------------> ARP_REQ
+            <----------ARP_REP     ...    	ARP_REP	 <--------------
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

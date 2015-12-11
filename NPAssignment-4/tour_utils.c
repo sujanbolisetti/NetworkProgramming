@@ -433,6 +433,9 @@ void join_mcast_grp(int udpsendsockfd){
 
 		Mcast_join(udpsendsockfd,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 
+		printf("%s has joined the multicast group using multicast address :%s and port number :%d\n",Gethostname(),
+																							MULTICAST_ADDRESS,MULTICAST_PORT_NUMBER);
+
 		joinedMulticastGrp = true;
 	}
 }

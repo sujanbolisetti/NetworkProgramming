@@ -88,7 +88,6 @@ int main(int argc, char **argv){
 	 */
 	udprecvsockfd = Socket(AF_INET,SOCK_DGRAM,0);
 
-
 	build_multicast_addr(&multi_addr);
 
 	Bind(udprecvsockfd,(SA *)&multi_addr,sizeof(struct sockaddr_in));
@@ -291,9 +290,13 @@ int main(int argc, char **argv){
 
 			if(!ALRM_SET){
 
+				printf("%s stops pinging the preceding node in the tour \n",Gethostname());
+
 				send_multicast_msg(udpsock,msg);
 
 				alarm(0);
+
+
 				/*
 				 *  Setting the sig-alarm for termination.
 				 */
