@@ -143,7 +143,7 @@ int main(){
 						process_arp_req(pf_sockfd,pkt,addr_ll.sll_ifindex);
 						break;
 					case ARP_REP:
-						printf("Received an arp_reply at node %s\n",Gethostname());
+						printf("Node at %s received an ARP_REP\n",Gethostname());
 						process_arp_rep(pkt);
 						break;
 				}

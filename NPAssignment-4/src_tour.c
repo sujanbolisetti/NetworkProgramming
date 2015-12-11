@@ -110,7 +110,7 @@ int main(int argc, char **argv){
 			printf("Completed the creation of tour list\n");
 		}
 
-		printf("%s is starting the tour\n",Gethostname());
+		printf("%s is starting the tour and it is the source node\n",Gethostname());
 
 		join_mcast_grp(udprecvsockfd);
 
@@ -187,14 +187,13 @@ int main(int argc, char **argv){
 					printf("Identification field is matching\n");
 				}
 
-				join_mcast_grp(udprecvsockfd);
+
 				/*
 				 *  Sending the ping to the predecessor.
 				 */
 				sig_alrm_handler(SIGALRM);
-				process_received_datagram(rt, udpsock, buff);
+				process_received_datagram(rt, udpsock,udprecvsockfd, buff);
 			}else{
-
 				if(DEBUG){
 					printf("Discarding the packet as the identification field in the ip packet didn't match %d\n",ip->ip_id);
 				}
@@ -248,7 +247,7 @@ int main(int argc, char **argv){
 			{
 				//printf("Received ping from next node %s\n", p_addr);
 
-				printf("%d bytes from %s (%s): icmp_seq:%u, ttl=%u\n",
+				printf("%d bytes from %s (%s): seq:%u, ttl=%u\n",
 																	ICMP_DATA_LEN,Gethostbyaddr(p_addr),p_addr,icmp->icmp_seq,ip->ip_ttl);
 			}else{
 				//printf("Received a ping but identification filed mismacth %u\n",icmp->icmp_type);
@@ -270,7 +269,7 @@ int main(int argc, char **argv){
 				printf("Error in recv-from of udp socket :%s\n",strerror(errno));
 			}
 
-			printf("Node %s Received %s\n",Gethostname(),udp_msg);
+			printf("Node %s Received: %s\n",Gethostname(),udp_msg);
 
 			char vm_name[20];
 
@@ -333,6 +332,6 @@ void sig_alrm_handler(int signum)
 
 void sig_alrm_handler_termination(int signum)
 {
-	printf("Node at %s Exiting the tour application\n",Gethostname());
+	printf("Node at %s exiting the tour application\n",Gethostname());
 	exit(0);
 }

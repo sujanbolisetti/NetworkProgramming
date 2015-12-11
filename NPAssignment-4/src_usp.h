@@ -140,6 +140,8 @@ void convertToNetworkOrder(struct arp_pkt *pkt);
 
 void convertToHostOrder(struct arp_pkt *pkt);
 
+void join_mcast_grp(int udpsendsockfd);
+
 bool
 create_tour_list(int count , char **argv, struct tour_route *tour_list);
 
@@ -173,7 +175,7 @@ forward_the_datagram(int sockfd, struct tour_payload payload);
 
 void allocate_buffer(char **buff);
 
-void process_received_datagram(int sockfd, int udp_sockfd, char *buff);
+void process_received_datagram(int sockfd, int udp_sockfd, int udprecvsockfd, char *buff);
 
 void send_multicast_msg(int udp_sockfd,char *msg);
 

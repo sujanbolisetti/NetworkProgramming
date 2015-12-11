@@ -8,13 +8,13 @@ CFLAGS = ${FLAGS} -Isrc/
 
 DEPS =  src_usp.h src_constants.h
 
-all: src_tour_sbolisetti_sthota src_arp_sbolisetti_sthota
+all: tour_sbolisetti_sthota arp_sbolisetti_sthota
 
-src_tour_sbolisetti_sthota: src_tour.o icmp_utils.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o get_hw_addrs.o
-	${CC} ${FLAGS} src_tour.o icmp_utils.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o get_hw_addrs.o -o src_tour_sbolisetti_sthota ${LIBS}
+tour_sbolisetti_sthota: src_tour.o icmp_utils.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o get_hw_addrs.o
+	${CC} ${FLAGS} src_tour.o icmp_utils.o tour_utils.o mcast_join_utils.o utils_wrapsock.o arp_utils.o get_hw_addrs.o -o tour_sbolisetti_sthota ${LIBS}
 	
-src_arp_sbolisetti_sthota: src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o icmp_utils.o
-	${CC} ${FLAGS} src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o icmp_utils.o -o src_arp_sbolisetti_sthota ${LIBS}
+arp_sbolisetti_sthota: src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o icmp_utils.o
+	${CC} ${FLAGS} src_arp.o arp_utils.o get_hw_addrs.o utils_wrapsock.o tour_utils.o mcast_join_utils.o icmp_utils.o -o arp_sbolisetti_sthota ${LIBS}
 
 src_arp.o: src_arp.c ${DEPS}
 	${CC} ${CFLAGS} -c src_arp.c
@@ -41,4 +41,4 @@ utils_wrapsock.o: utils_wrapsock.c
 	${CC} ${CFLAGS} -c utils_wrapsock.c	
 
 clean:
-	rm src_tour_sbolisetti_sthota src_arp_sbolisetti_sthota *.o
+	rm tour_sbolisetti_sthota arp_sbolisetti_sthota *.o

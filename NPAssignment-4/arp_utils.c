@@ -61,10 +61,10 @@ void print_my_hw_ip_mp(){
 
 	struct ip_addr_hw_addr_pr *temp_my_hw_addr = my_hw_addr_head;
 
-	printf("---------------Printing ip address and mac Address pairs of interface eth0-------------------\n");
+	printf("---------------Printing ip address and mac Address pairs of interface eth0------------------\n");
 	while(temp_my_hw_addr != NULL){
 
-		 printf(" IP addr = %s\n", temp_my_hw_addr->ip_addr);
+		 printf("\t IP addr = %s", temp_my_hw_addr->ip_addr);
 
 		 printHWADDR(temp_my_hw_addr->mac_addr);
 		 temp_my_hw_addr = temp_my_hw_addr->next;
@@ -74,7 +74,7 @@ void print_my_hw_ip_mp(){
 
 void printHWADDR(char *hw_addr){
 
-	printf(" MAC addr = ");
+	printf("  MAC addr = ");
 	char *ptr = hw_addr;
 	int i = IF_HADDR;
 	do {
@@ -137,7 +137,7 @@ struct arp_pkt* build_arp_pkt(int pkt_type, unsigned char *snd_hw_addr,
 	struct arp_pkt *pkt = (struct arp_pkt *)malloc(sizeof(struct arp_pkt));
 
 	pkt->hard_type =  1;
-	pkt->prot_type =ARP_GRP_TYPE;
+	pkt->prot_type = 0x800;
 	pkt->hard_size = 6;
 	pkt->prot_size = 4;
 	pkt->op = pkt_type;
@@ -159,8 +159,8 @@ void print_arp_packet(struct arp_pkt *pkt){
 	printf("\t Hardware type :%u\n",pkt->hard_type);
 
 	printf("\t Protocol type :%d\n",pkt->prot_type);
-	printf("\t Hardware address size (in bytes) :%u\n",pkt->hard_size);
-	printf("\t Protocol address size :%u\n",pkt->prot_size);
+	printf("\t Hardware address size (in bytes) :%u\n",ETH_ALEN);
+	printf("\t Protocol address size :%u\n",4);
 	printf("\t Operation :%d\n",pkt->op);
 
 	printf("\t Sender ");
@@ -216,24 +216,22 @@ void build_eth_frame(void *buffer,char *dest_mac,
 	addr_ll->sll_addr[6] = 0x00;
 	addr_ll->sll_addr[7] = 0x00;
 
-
-	printf("-------------------------ARP Ethernet Frame Hdr------------------------------------\n");
+	printf("--------------------------------------------------------------------------------------------\n");
+	printf("---------------------------------ARP Ethernet Frame Hdr-------------------------------------\n");
 
 	printf("Destination");
 	printHWADDR_ARP(dest_mac);
 	printf("\t Source");
 	printHWADDR_ARP(src_mac);
 	printf("\t Frame type :%d\n",ARP_GRP_TYPE);
-	printf("----------------------------------------------------------------------------------\n");
+	printf("--------------------------------------------------------------------------------------------\n");
 
 	if(pkt->op == ARP_REQ)
-		printf("-------------------------Message in arp_req packet-----------------------------------------------\n");
+		printf("-------------------------Message in arp_req packet------------------------------------------\n");
 	else if(pkt->op == ARP_REP)
-		printf("-------------------------Message in arp_rep packet-----------------------------------------------\n");
+		printf("-------------------------Message in arp_rep packet------------------------------------------\n");
 
 	print_arp_packet(pkt);
-
-
 	convertToNetworkOrder(pkt);
 
 	memcpy(data,pkt,sizeof(struct arp_pkt));
@@ -297,12 +295,12 @@ void process_arp_req(int pf_sockfd,struct arp_pkt *pkt,int recv_if_index){
 	// check if this arp_req is for me. if so send a arp_reply.
 	if(arp_req_is_for_me(pkt->target_ip_address)){
 
-		printf("ARP_REQ belongs to me at node %s\n",Gethostname());
+		printf("Node at %s has received a ARP_REQ which belongs to it\n",Gethostname());
 
 		update_arp_cache(pkt->snd_ethr_addr,pkt->snd_ip_address,recv_if_index,INVALID_SOCK_DESC);
 		send_arp_reply(pf_sockfd,pkt);
 	}else{
-		printf("Discarding the arp req at node %s as it doesn't belongs to me\n",Gethostname());
+		printf("Node at %s discarding the received ARP_REQ as it doesn't belongs to it\n",Gethostname());
 	}
 }
 
@@ -323,6 +321,10 @@ void process_arp_rep(struct arp_pkt *pkt){
 
 		memcpy(uds_msg.hw_addr.sll_addr, temp->hw_address,ETH_ALEN);
 
+		printf("%s is updating (can be either add/update) its ARP_CACHE\n",Gethostname());
+
+		print_arp_cache();
+
 		uds_msg.hw_addr.sll_halen = ETH_ALEN;
 
 		uds_msg.hw_addr.sll_hatype = ETH_HA_TYPE;
@@ -331,12 +333,14 @@ void process_arp_rep(struct arp_pkt *pkt){
 
 		if(temp->cli_sockdes > 0){
 
+			printf("Sending the requested mac-address for ip-address %s in unix domain socket \n",pkt->snd_ip_address);
+
 			if(sendto(temp->cli_sockdes,&uds_msg,sizeof(uds_msg),0,NULL,0) < 0){
 
 				printf("Error in sendto in uds socket %s\n",strerror(errno));
 			}
 
-			printf("Sending the requested mac-address for ip-address %s in unix domain socket \n",pkt->snd_ip_address);
+
 			temp->cli_sockdes = INVALID_SOCK_DESC;
 			close(temp->cli_sockdes);
 		}else{
@@ -507,7 +511,8 @@ void print_arp_cache(){
 
 	struct arp_cache_entry *temp = arp_cache_head;
 
-	printf("----------------------------------Printing ARP Cache---------------------------------------------\n");
+	printf("--------------------------------------------------------------------------------------------\n");
+	printf("----------------------------------Printing ARP Cache----------------------------------------\n");
 
 	while(temp != NULL){
 
@@ -520,6 +525,6 @@ void print_arp_cache(){
 		temp = temp->next;
 	}
 
-	printf("--------------------------------------------------------------------------------------------------\n");
+	printf("--------------------------------------------------------------------------------------------\n");
 
 }

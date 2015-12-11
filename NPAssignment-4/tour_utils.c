@@ -40,8 +40,11 @@ bool create_tour_list(int count , char **argv, struct tour_route *tour_list){
 		}
 	}
 
+
 	insert_me_address_at_bgn(tour_list);
 	insert_multicast_address_at_lst(count, tour_list);
+
+	printf("Built the tour list at node %s\n",Gethostname());
 
 	return false;
 }
@@ -283,7 +286,7 @@ calculate_length(){
 	return IP_HDR_LEN + sizeof(struct tour_payload);
 }
 
-void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
+void process_received_datagram(int sockfd, int udp_sockfd,int udprecvsockfd, char *buff){
 
 	if(DEBUG)
 		printf("%s has received the datagram\n",Gethostbyname(Gethostname()));
@@ -305,6 +308,8 @@ void process_received_datagram(int sockfd, int udp_sockfd, char *buff){
 	printf("%s received source routing packet from %s\n",time_buff,Gethostbyaddr(src_addr));
 
 	add_prev_node(src_addr);
+
+	join_mcast_grp(udprecvsockfd);
 
 	char *data = buff + IP_HDR_LEN;
 
@@ -377,7 +382,7 @@ void
 print_the_payload(struct tour_payload payload){
 
 	int i=0;
-	printf("Index : %d and Size of list : %d  in received payload\n",payload.index,payload.count);
+	printf("Index : %d and Size of list : %d  in the payload\n",payload.index,payload.count);
 
 	printf("printing the received tour\n");
 
@@ -426,7 +431,8 @@ forward_the_datagram(int sockfd, struct tour_payload payload){
 
 void join_mcast_grp(int udpsendsockfd){
 
-	if(!joinedMulticastGrp){
+	if(!joinedMulticastGrp)
+	{
 		struct sockaddr_in multi_addr;
 
 		build_multicast_addr(&multi_addr);
@@ -434,7 +440,7 @@ void join_mcast_grp(int udpsendsockfd){
 		Mcast_join(udpsendsockfd,(SA *)&multi_addr,sizeof(multi_addr),NULL,0);
 
 		printf("%s has joined the multicast group using multicast address :%s and port number :%d\n",Gethostname(),
-																							MULTICAST_ADDRESS,MULTICAST_PORT_NUMBER);
+																									MULTICAST_ADDRESS,MULTICAST_PORT_NUMBER);
 
 		joinedMulticastGrp = true;
 	}

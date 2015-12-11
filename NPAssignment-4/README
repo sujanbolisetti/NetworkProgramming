@@ -22,13 +22,13 @@ RUNNING THE PROJECT:
 --------------------
 Before running the project, it needs to be compiled (Instructions to compile the project)
 Kindly use deploy_app application to push the executables with names
-1. src_tour_sbolisetti_sthota [tour application]
-2. src_arp_sbolisetti_sthota [Arp Module]
+1. tour_sbolisetti_sthota [tour application]
+2. arp_sbolisetti_sthota [Arp Module]
 
 Starting tour application:
 -------------------------
-	You can start the tour application by running this command './src_tour_sbolisetti_sthota'. The tour application at the source node should be started by list of the node names in the tour as arguments. 
-		Eg: ./src_tour_sbolisetti_sthota vm2 vm3 ==> So here the tour nodes are vm2 and vm3.
+	You can start the tour application by running this command './tour_sbolisetti_sthota'. The tour application at the source node should be started by list of the node names in the tour as arguments. 
+		Eg: ./tour_sbolisetti_sthota vm2 vm3 ==> So here the tour nodes are vm2 and vm3.
 
 
 Tour Application:
@@ -61,7 +61,7 @@ ARP application:
 
 Starting Arp Module:
 --------------------
-	You can start the arp module by running the command './src_arp_sbolisetti_sthota'
+	You can start the arp module by running the command './arp_sbolisetti_sthota'
 
 1. Similar to ARP module our arp application also will perform the same task of getting the mac address given an IP Address on LAN.
 2. We will send the ARP request to all the nodes in the LAN by setting the destination address as the broadcast address.
@@ -72,7 +72,7 @@ Starting Arp Module:
 7. We have standard ethernet packet types: ARP_REQ -> 1 and ARP_REP -> 2.
 8. Every node uses the arp module to get the ip address of the preceding node so that it can send ping packet.
 9. The tour application used unix domain stream socket to communicate with the ARP module underneath.
-
+10. In the arp_req packet the target ip address will come as 00:00:00:00:00:00 indicating that it is blank.
 
 Interaction between tour application and Arp application.
 
